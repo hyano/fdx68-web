@@ -396,8 +396,11 @@ code { font-family: var(--font-mono); font-size: 0.9em; }
 
 /* --- 一括操作 ------------------------------------------------------------- */
 
-.bulk-bar[hidden] { display: none; }
-
+/*
+ * 選択の有無にかかわらず常に表示する。選択した瞬間にバーが現れると
+ * ツリー全体が下にずれ、狙った行を押せなくなるため。
+ * 選択 0 件のときは背景の強調をやめ、ボタンを disabled にする。
+ */
 .bulk-bar {
   flex: none;
   display: flex;
@@ -408,6 +411,11 @@ code { font-family: var(--font-mono); font-size: 0.9em; }
   background: var(--color-selected-bg);
   border-radius: var(--radius-sm);
   font-size: var(--font-size-small);
+}
+
+.bulk-bar[data-empty="true"] {
+  background: var(--color-surface-alt);
+  color: var(--color-text-weak);
 }
 
 /* --- アップロード --------------------------------------------------------- */

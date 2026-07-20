@@ -655,8 +655,12 @@ elements.fileInput.addEventListener("change", async () => {
 // --- 一括操作バー -----------------------------------------------------------
 
 tree.onSelectionChange = (paths) => {
-  elements.bulkBar.hidden = paths.length === 0;
+  const empty = paths.length === 0;
+  elements.bulkBar.dataset.empty = String(empty);
   elements.bulkCount.textContent = `${paths.length} 件選択中`;
+  for (const button of elements.bulkBar.querySelectorAll("button")) {
+    button.disabled = empty;
+  }
 };
 
 document.getElementById("btn-bulk-delete").addEventListener("click", () => {
