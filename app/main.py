@@ -10,6 +10,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api import drives, images, status, system, ws
+from app.backends.base import FDX68Backend
 from app.backends.factory import create_backend
 from app.config import Settings, get_settings
 from app.errors import FDX68Error
@@ -28,6 +29,23 @@ def _configure_logging() -> None:
         level=logging.INFO,
         format="%(asctime)s %(levelname)-8s %(name)s: %(message)s",
     )
+
+
+async def _autostart_fddemu(backend: FDX68Backend, fdx68_service: FDX68Service) -> None:
+    """設定で有効な場合に fddemu を自動起動する。
+
+    Web UI の再起動をまたいで fddemu プロセスは生き続ける設計（KillMode=process）
+    なので、既に起動していれば何もしない。起動失敗は Web UI 自体の起動を
+    止めるほどではないので、ログ警告に留める。
+    """
+    if await backend.is_fddemu_running():
+        logger.info("fddemu は既に起動しているため、自動起動をスキップします。")
+        return
+
+    try:
+        await fdx68_service.start_fddemu()
+    except FDX68Error as exc:
+        logger.warning("fddemu の自動起動に失敗しました: %s", exc.message)
 
 
 @asynccontextmanager
@@ -57,6 +75,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.system_service = system_service
     app.state.connection_manager = connection_manager
     app.state.status_monitor = status_monitor
+
+    if settings.autostart_fddemu:
+        await _autostart_fddemu(backend, fdx68_service)
 
     status_monitor.start()
     try:

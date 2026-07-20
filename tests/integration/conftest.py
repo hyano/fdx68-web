@@ -46,6 +46,7 @@ def settings(image_root: Path) -> Settings:
         backend="mock",
         image_dir=image_root,
         status_interval=60.0,  # テスト中に勝手にポーリングさせない
+        autostart_fddemu=False,  # 起動直後の状態をテストが制御できるようにする
         max_upload_mb=1,
     )
 

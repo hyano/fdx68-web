@@ -94,6 +94,7 @@ FDX68 が未導入の場合は、専用シールドの所有を確認したう�
 | `FDX68_STATUS_INTERVAL` | `2` | ドライブ状態を取得する間隔（秒） |
 | `FDX68_MAX_UPLOAD_MB` | `256` | アップロード 1 ファイルあたりの上限（MB） |
 | `FDX68_FDDEMU_OPTIONS` | （空） | fddemu の起動オプション。空なら FDX68 の既定値 |
+| `FDX68_AUTOSTART_FDDEMU` | `true` | Web UI 起動時に fddemu も自動起動するか |
 | `FDX68_HOST` | `0.0.0.0` | 待ち受けアドレス |
 | `FDX68_PORT` | `8000` | 待ち受けポート |
 

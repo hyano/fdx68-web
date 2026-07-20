@@ -44,6 +44,9 @@ class Settings(BaseSettings):
     # 空なら FDX68 の既定値（-o x1 -o q0 -o m1 -o c0）が使われる
     fddemu_options: str = ""
 
+    # Web UI 起動時に fddemu も自動起動するか
+    autostart_fddemu: bool = True
+
     host: str = "0.0.0.0"  # noqa: S104  LAN 内からアクセスするため全インターフェースで待ち受ける
     port: int = 8000
 
