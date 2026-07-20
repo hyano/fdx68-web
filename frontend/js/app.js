@@ -382,9 +382,22 @@ elements.tree.addEventListener("click", async (event) => {
     }
   }
 
+  // ⋯ メニューや操作ボタンのある領域は個別操作のための場所なので、
+  // ボタンの隙間を押しても行の選択は動かさない。
+  if (event.target.closest(".node__actions, .node__quick-actions")) return;
+
   // 行のクリックは選択。ディレクトリはダブルクリックでも開閉する。
   if (event.target.closest(".node__row")) {
     tree.toggleSelection(node, { additive: event.shiftKey || event.metaKey || event.ctrlKey });
+  }
+});
+
+// メニューの外側をクリックしたら閉じる。別の行の ⋯ を押したときも、
+// そのメニューは対象外になるので、開きっぱなしが重ならない。
+// ツリーは再描画で DOM が入れ替わるため、リスナーは document に置く。
+document.addEventListener("click", (event) => {
+  for (const menu of document.querySelectorAll("details.menu[open]")) {
+    if (!menu.contains(event.target)) menu.open = false;
   }
 });
 
