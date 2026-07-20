@@ -290,6 +290,14 @@ code { font-family: var(--font-mono); font-size: 0.9em; }
 .node__icon { font-size: var(--icon-size); flex: none; }
 .node__name { overflow-wrap: anywhere; }
 
+/* D0 / D1 / 変換 はファイル名のすぐ右に表示する */
+.node__quick-actions {
+  display: flex;
+  gap: var(--space-xs);
+  align-items: center;
+  flex: none;
+}
+
 /*
  * 変換が必要なイメージのバッジ。
  * JS はバッジの DOM を作らない。data-kind から CSS が生成する。
