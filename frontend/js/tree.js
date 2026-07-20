@@ -85,6 +85,7 @@ export class ImageTree {
   async load() {
     await this.renderInto(this.root, ROOT_PATH);
     await this.restoreExpanded();
+    this.syncTabStop();
   }
 
   /**
@@ -97,20 +98,11 @@ export class ImageTree {
     );
     for (const path of paths) {
       const node = this.findNode(path);
-      if (node) await this.expand(node, { save: false });
+      if (node) await this.expandNode(node, { save: false });
     }
   }
 
   async renderInto(container, path) {
-    try {
-      await this.renderEntries(container, path);
-    } finally {
-      // 行が増減すれば Tab の受け口も作り直す必要がある
-      this.syncTabStop();
-    }
-  }
-
-  async renderEntries(container, path) {
     let listing;
     try {
       listing = await api.list(path);
@@ -221,7 +213,20 @@ export class ImageTree {
     }
   }
 
-  async expand(node, { save = true } = {}) {
+  /**
+   * 展開する。Tab の受け口の付け替えまで行う。
+   *
+   * まとめて複数を開く場合は expandNode() を使い、最後に一度だけ
+   * syncTabStop() を呼ぶこと。展開のたびに走査すると、
+   * 復元時に開いた数だけ全ノードを舐め直すことになる。
+   */
+  async expand(node, options = {}) {
+    await this.expandNode(node, options);
+    this.syncTabStop();
+  }
+
+  /** 展開の実処理。Tab の受け口は触らない。 */
+  async expandNode(node, { save = true } = {}) {
     const path = node.dataset.path;
     const children = node.querySelector(".node__children");
 
@@ -262,6 +267,7 @@ export class ImageTree {
 
     await this.renderInto(this.root, ROOT_PATH);
     await this.restoreExpanded();
+    this.syncTabStop();
 
     if (this.root.parentElement) this.root.parentElement.scrollTop = scrollTop;
   }
