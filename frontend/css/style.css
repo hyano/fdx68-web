@@ -194,6 +194,11 @@ code { font-family: var(--font-mono); font-size: 0.9em; }
   margin-bottom: var(--space-sm);
 }
 
+.drive__badges {
+  display: flex;
+  gap: var(--space-xs);
+}
+
 .drive__badge {
   font-size: var(--font-size-small);
   padding: 0 var(--space-sm);
@@ -205,6 +210,18 @@ code { font-family: var(--font-mono); font-size: 0.9em; }
 /* ライトプロテクトが有効なときだけ目立たせる */
 .drive[data-protected="true"] .drive__badge--wp {
   background: var(--color-warning);
+  color: var(--color-text-inverse);
+}
+
+/* ディスク挿入中でアクセスがない */
+.drive[data-access="idle"] .drive__badge--access {
+  background: var(--color-success);
+  color: var(--color-text-inverse);
+}
+
+/* シリンダ位置が最近変化した＝X68000 がアクセスした可能性がある */
+.drive[data-access="active"] .drive__badge--access {
+  background: var(--color-danger);
   color: var(--color-text-inverse);
 }
 
@@ -223,15 +240,6 @@ code { font-family: var(--font-mono); font-size: 0.9em; }
 
 /* 挿入中のドライブを目立たせる */
 .drive[data-state="inserted"] { border-color: var(--color-mounted); }
-
-/* シリンダ位置が最近変化した＝X68000 がアクセスした可能性がある */
-.drive__warning {
-  display: none;
-  margin: var(--space-sm) 0 0;
-  font-size: var(--font-size-small);
-  color: var(--color-warning);
-}
-.drive[data-recent="true"] .drive__warning { display: block; }
 
 /* --- ツリー --------------------------------------------------------------- */
 

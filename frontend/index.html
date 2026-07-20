@@ -94,10 +94,13 @@
 -->
 
 <template id="tpl-drive">
-  <article class="drive" data-drive="" data-state="empty" data-recent="false">
+  <article class="drive" data-drive="" data-state="empty" data-access="none">
     <header class="drive__head">
       <h3 class="drive__title"></h3>
-      <span class="drive__badge drive__badge--wp">WP</span>
+      <div class="drive__badges">
+        <span class="drive__badge drive__badge--access">ACCESS</span>
+        <span class="drive__badge drive__badge--wp">WP</span>
+      </div>
     </header>
     <dl class="drive__info">
       <dt>イメージ</dt>
@@ -105,7 +108,6 @@
       <dt>シリンダ</dt>
       <dd class="drive__cylinder">—</dd>
     </dl>
-    <p class="drive__warning">X68000 がディスクにアクセス中の可能性があります。</p>
     <div class="button-row">
       <button type="button" class="button drive__eject">イジェクト</button>
       <button type="button" class="button drive__protect">プロテクト切替</button>

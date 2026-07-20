@@ -108,7 +108,10 @@ function renderDrives(drives) {
     card.dataset.drive = String(drive.id);
     card.dataset.state = drive.inserted ? "inserted" : "empty";
     card.dataset.protected = String(drive.write_protected);
-    card.dataset.recent = String(isRecentlyAccessed(drive));
+    const recentlyAccessed = isRecentlyAccessed(drive);
+    card.dataset.access = drive.inserted
+      ? (recentlyAccessed ? "active" : "idle")
+      : "none";
 
     card.querySelector(".drive__title").textContent = `Drive ${drive.id}`;
     const imagePath = drive.image_relative || drive.image;
