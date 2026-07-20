@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from app.backends.base import FDX68Backend
+from app.command.parser import parse_disk_info
 from app.errors import CommandFailed
 from app.models.drive import Drive, FDX68Status
 from app.models.image import AnalyzeMode, DataFormat, DiskInfo, DiskType
@@ -175,9 +176,6 @@ class MockFDX68Backend(FDX68Backend):
 
         raw = await asyncio.to_thread(path.read_bytes)
         text = raw.decode("utf-8", errors="replace")
-
-        from app.command.parser import parse_disk_info
-
         return parse_disk_info(text)
 
     async def set_disk_attributes(

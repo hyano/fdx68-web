@@ -68,9 +68,6 @@ def validate_name(name: str) -> str:
     受け取るのは**パスではなく単一の名前**である。
     日本語などの Unicode 文字は許可する（X68000 のソフト名を日本語で管理するため）。
     """
-    if name is None:
-        raise InvalidPath("名前が指定されていません。")
-
     # 正規化しておかないと、見た目が同じでバイト列が異なる名前が混在する
     normalized = unicodedata.normalize("NFC", name)
 
@@ -89,10 +86,7 @@ def validate_name(name: str) -> str:
     if normalized in {".", ".."}:
         raise InvalidPath("その名前は使えません。")
 
-    if normalized.startswith(".") and normalized.endswith("."):
-        # 先頭のドットは隠しファイルとして許容するが、末尾のドットは許可しない
-        raise InvalidPath("名前の末尾にドットは使えません。")
-
+    # 先頭のドットは隠しファイルとして許容するが、末尾のドットは許可しない
     if normalized.endswith("."):
         raise InvalidPath("名前の末尾にドットは使えません。")
 

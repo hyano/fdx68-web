@@ -52,14 +52,11 @@ function parentOf(path) {
 }
 
 export class ImageTree {
-  constructor(root, { onAction, onError }) {
+  constructor(root) {
     this.root = root;
-    this.onAction = onAction;
-    this.onError = onError;
     this.template = document.getElementById("tpl-node");
     this.expanded = this.loadExpanded();
     this.selected = new Set();
-    this.mounted = new Map();
     this.onSelectionChange = null;
   }
 
@@ -264,7 +261,6 @@ export class ImageTree {
       list.push(drive.id);
       byPath.set(drive.image_relative, list);
     }
-    this.mounted = byPath;
 
     for (const node of this.root.querySelectorAll(".node")) {
       const ids = byPath.get(node.dataset.path) ?? [];

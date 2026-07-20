@@ -36,15 +36,17 @@ app/
 ├── main.py                FastAPI の生成、lifespan での監視タスク起動、静的ファイル配信
 ├── config.py              pydantic-settings による環境変数の読み込み
 ├── deps.py                バックエンド・サービスの依存注入
+├── errors.py              アプリケーション共通の例外（HTTP ステータスへの対応付けを持つ）
 ├── api/
-│   ├── status.py          GET /api/health, GET /api/status
+│   ├── status.py          GET /api/health, GET /api/status, fddemu の起動・停止
 │   ├── drives.py          ドライブ操作（挿入・イジェクト・プロテクト）
 │   ├── images.py          イメージ管理（一覧・変換・作成・移動・複製・アップロード等）
-│   ├── system.py          再起動・シャットダウン
+│   ├── system.py          再起動・シャットダウン・Web UI 自身のサービス再起動
 │   └── ws.py              WebSocket エンドポイント
 ├── services/
 │   ├── fdx68_service.py   ドライブ操作・fddemu 制御の業務ロジック
-│   ├── image_service.py   パス検証・ファイル操作・ガード条件
+│   ├── image_service.py   ファイル操作・ガード条件
+│   ├── paths.py           パスと名前の検証（クライアント由来の文字列の唯一の入口）
 │   └── system_service.py  システム操作
 ├── backends/
 │   ├── base.py            抽象基底クラス
@@ -69,8 +71,8 @@ app/
 # app/backends/factory.py
 def create_backend(settings: Settings) -> FDX68Backend:
     if settings.backend == "mock":
-        return MockFDX68Backend(...)
-    return RealFDX68Backend(...)
+        return MockFDX68Backend()
+    return RealFDX68Backend(settings, SubprocessCommandRunner())
 ```
 
 `platform.system() == "Darwin"` のような判定をコード中に散在させません。
@@ -118,12 +120,13 @@ SD カードへのアクセスが fddemu のリアルタイム動作に影響し
 ### パス検証は 1 箇所に集約する
 
 ```python
-def resolve_safe(rel: str) -> Path:
-    if PurePosixPath(rel).is_absolute():
+def resolve_safe(root: Path, relative: str | None) -> Path:
+    rel = (relative or "").strip()
+    if rel.startswith("/") or PurePosixPath(rel).is_absolute():
         raise InvalidPath
-    root = settings.image_dir.resolve()
-    target = (root / rel).resolve()
-    if target != root and root not in target.parents:
+    root_resolved = root.resolve()
+    target = (root_resolved / rel).resolve()
+    if target != root_resolved and root_resolved not in target.parents:
         raise InvalidPath
     return target
 ```

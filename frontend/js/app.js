@@ -45,7 +45,7 @@ const state = {
   uploading: false,
 };
 
-const tree = new ImageTree(elements.tree, {});
+const tree = new ImageTree(elements.tree);
 
 // --- エラー表示 -------------------------------------------------------------
 
@@ -671,9 +671,9 @@ function dropTargetFolder(event) {
 elements.treeContainer.addEventListener("dragover", (event) => {
   event.preventDefault();
 
-  // Option (Alt) 併用でコピー。カーソル表示も切り替える。
+  // 外部からのファイル投下は常にコピー。内部ドラッグは Option (Alt) 併用でコピー。
   event.dataTransfer.dropEffect =
-    !isExternalFileDrag(event) && event.altKey ? "copy" : isExternalFileDrag(event) ? "copy" : "move";
+    isExternalFileDrag(event) || event.altKey ? "copy" : "move";
 
   clearDropTargets();
   elements.treeContainer.dataset.dragover = "true";

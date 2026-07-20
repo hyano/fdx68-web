@@ -5,7 +5,7 @@ import time
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from app.deps import FDX68ServiceDep, StatusMonitorDep
+from app.deps import FDX68ServiceDep, SettingsDep, StatusMonitorDep
 from app.models.drive import FDX68Status
 
 router = APIRouter(prefix="/api", tags=["status"])
@@ -30,11 +30,9 @@ class StartRequest(BaseModel):
 
 
 @router.get("/health", response_model=HealthResponse)
-async def health(service: FDX68ServiceDep) -> HealthResponse:
+async def health(settings: SettingsDep) -> HealthResponse:
     """疎通確認。デプロイスクリプトとインストーラが使う。"""
-    from app.config import get_settings
-
-    return HealthResponse(status="ok", backend=get_settings().backend, started_at=_STARTED_AT)
+    return HealthResponse(status="ok", backend=settings.backend, started_at=_STARTED_AT)
 
 
 @router.get("/status", response_model=FDX68Status)
