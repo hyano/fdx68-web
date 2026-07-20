@@ -22,7 +22,15 @@ import {
 const INTERNAL_MIME = "application/x-fdx68-paths";
 
 /** シリンダ位置が変化してから「アクセス中の可能性あり」と表示し続ける時間（ミリ秒）。 */
-const RECENT_ACCESS_WINDOW = 10000;
+const RECENT_ACCESS_WINDOW = 3000;
+
+/**
+ * ACCESS バッジの経過時間を再評価する間隔（ミリ秒）。
+ *
+ * 状態が変化しなければサーバは何も送ってこないため、
+ * アクセスが止まったことは時間の経過でしか分からない。
+ */
+const ACCESS_REFRESH_INTERVAL = 1000;
 
 const elements = {
   emulator: document.getElementById("emulator"),
@@ -93,6 +101,12 @@ function renderDrives(drives) {
   const template = document.getElementById("tpl-drive");
   elements.drives.replaceChildren();
 
+  // 消えたドライブの記録は捨てる。fddemu の停止をまたいで古い時刻が残らないように。
+  const present = new Set(drives.map((drive) => drive.id));
+  for (const id of state.cylinderSeen.keys()) {
+    if (!present.has(id)) state.cylinderSeen.delete(id);
+  }
+
   if (drives.length === 0) {
     const note = document.createElement("p");
     note.className = "note";
@@ -108,9 +122,9 @@ function renderDrives(drives) {
     card.dataset.drive = String(drive.id);
     card.dataset.state = drive.inserted ? "inserted" : "empty";
     card.dataset.protected = String(drive.write_protected);
-    const recentlyAccessed = isRecentlyAccessed(drive);
+    noteCylinder(drive);
     card.dataset.access = drive.inserted
-      ? (recentlyAccessed ? "active" : "idle")
+      ? (isRecentlyAccessed(drive.id) ? "active" : "idle")
       : "none";
 
     card.querySelector(".drive__title").textContent = `Drive ${drive.id}`;
@@ -152,28 +166,52 @@ function renderDrives(drives) {
 }
 
 /**
- * シリンダ位置が最近変化したかを判定する。
+ * シリンダ位置の変化を記録する。
  *
  * ヘッドシークの痕跡であり、X68000 がディスクにアクセスした可能性を示す。
  * ハード的な保証ではないヒントとして扱う。
+ *
+ * 判定（isRecentlyAccessed）と分けているのは、新しいドライブ情報が届かなくても
+ * 経過時間だけを再評価できるようにするため。
  */
-function isRecentlyAccessed(drive) {
+function noteCylinder(drive) {
   const previous = state.cylinderSeen.get(drive.id);
-  const now = Date.now();
 
-  if (!previous || previous.cylinder !== drive.cylinder) {
-    state.cylinderSeen.set(drive.id, { cylinder: drive.cylinder, at: now });
-    // 初回は「変化」ではないので警告しない
-    return Boolean(previous);
+  // 初回は「変化」ではないので、基準値だけ覚えてアクセス時刻は残さない
+  if (!previous) {
+    state.cylinderSeen.set(drive.id, { cylinder: drive.cylinder, at: null });
+    return;
   }
 
-  return now - previous.at < RECENT_ACCESS_WINDOW;
+  if (previous.cylinder !== drive.cylinder) {
+    state.cylinderSeen.set(drive.id, { cylinder: drive.cylinder, at: Date.now() });
+  }
+}
+
+/** 直近にシリンダ位置が変化したか。状態は変えない。 */
+function isRecentlyAccessed(driveId) {
+  const entry = state.cylinderSeen.get(driveId);
+  if (!entry || entry.at === null) return false;
+  return Date.now() - entry.at < RECENT_ACCESS_WINDOW;
 }
 
 function anyDriveRecentlyAccessed() {
-  return [...state.cylinderSeen.values()].some(
-    (entry) => Date.now() - entry.at < RECENT_ACCESS_WINDOW
-  );
+  return [...state.cylinderSeen.keys()].some(isRecentlyAccessed);
+}
+
+/**
+ * ACCESS バッジだけを現在時刻で塗り直す。
+ *
+ * カードの作り直しはしない。毎秒 DOM とイベントリスナを差し替えると
+ * 操作中の状態を壊すため。
+ */
+function refreshAccessBadges() {
+  for (const card of elements.drives.querySelectorAll(".drive")) {
+    if (card.dataset.state !== "inserted") continue;
+    card.dataset.access = isRecentlyAccessed(Number(card.dataset.drive))
+      ? "active"
+      : "idle";
+  }
 }
 
 /** アクセス中かもしれないときに一言添える。 */
@@ -811,6 +849,13 @@ const socket = new StatusSocket({
       labels[connectionState] ?? connectionState;
   },
 });
+
+/*
+ * サーバは状態が変化したときしか送ってこないので、
+ * 「アクセスが止まった」ことは時間の経過でしか分からない。
+ * ここでバッジの色だけを定期的に見直す（通信は発生しない）。
+ */
+setInterval(refreshAccessBadges, ACCESS_REFRESH_INTERVAL);
 
 /*
  * ウィンドウにフォーカスが戻ったら更新する。
