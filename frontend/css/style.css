@@ -380,6 +380,8 @@ code { font-family: var(--font-mono); font-size: 0.9em; }
 
 /* --- 一括操作 ------------------------------------------------------------- */
 
+.bulk-bar[hidden] { display: none; }
+
 .bulk-bar {
   flex: none;
   display: flex;
