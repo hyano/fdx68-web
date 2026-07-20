@@ -13,6 +13,7 @@ import pytest
 from app.backends.real import RealFDX68Backend
 from app.command.runner import CommandResult, FakeCommandRunner
 from app.config import Settings
+from app.errors import CommandFailed
 
 DEVICE_LIST = """\
  ID | WP | CL | DISK IMAGE
@@ -122,6 +123,68 @@ async def test_use_sudo_が_false_なら昇格しない(runner: FakeCommandRunne
     assert runner.calls[-1][0] == "/usr/bin/systemctl"
 
 
+#: fddctl -l が「fddemu が疎通できない」ときに返す出力
+_CONNECT_ERROR = CommandResult(
+    args=[], returncode=0, stdout="Error: can't connect to emulator\n", stderr=""
+)
+
+#: pgrep が「fddemu が生存している」ときに返す出力
+_ALIVE = CommandResult(args=["pgrep", "-x", "fddemu"], returncode=0, stdout="1234\n", stderr="")
+
+
+async def test_起動確認が遅延しても成功する(
+    backend: RealFDX68Backend, runner: FakeCommandRunner, monkeypatch: pytest.MonkeyPatch
+):
+    """疎通確認が数回失敗しても、プロセスが生存していればポーリングで成功する。
+
+    実機（Pi 3 A+）ではメモリが逼迫しており、疎通まで 1 秒を超えることがある。
+    固定 1 回待ちだと誤って「起動できませんでした」になっていた不具合の回帰テスト。
+    """
+    monkeypatch.setattr("app.backends.real._STARTUP_TIMEOUT", 1.0)
+    monkeypatch.setattr("app.backends.real._POLL_INTERVAL", 0.01)
+
+    # 起動前チェックでは未起動、以降は生存している状態を返す
+    runner.sequences[("pgrep", "-x", "fddemu")] = [NOT_FOUND]
+    runner.responses[("pgrep", "-x", "fddemu")] = _ALIVE
+
+    # 疎通確認は 2 回失敗させたあと、runner.default_result (DEVICE_LIST) で成功させる
+    runner.sequences[("/usr/local/bin/fddctl", "-l")] = [_CONNECT_ERROR, _CONNECT_ERROR]
+
+    await backend.start_fddemu()  # 例外が出なければ成功
+
+
+async def test_起動直後にプロセスが消えたら失敗する(
+    backend: RealFDX68Backend, runner: FakeCommandRunner, monkeypatch: pytest.MonkeyPatch
+):
+    """疎通確認に失敗し、かつプロセスも生きていない場合のみ本当の起動失敗とみなす。"""
+    monkeypatch.setattr("app.backends.real._STARTUP_TIMEOUT", 1.0)
+    monkeypatch.setattr("app.backends.real._POLL_INTERVAL", 0.01)
+
+    runner.default_result = _CONNECT_ERROR
+    # pgrep は fixture 既定のまま NOT_FOUND（= プロセスは生きていない）
+
+    with pytest.raises(CommandFailed):
+        await backend.start_fddemu()
+
+
+async def test_起動確認がタイムアウトしてもプロセスが生きていれば成功する(
+    backend: RealFDX68Backend, runner: FakeCommandRunner, monkeypatch: pytest.MonkeyPatch
+):
+    """疎通確認が最後まで失敗しても、プロセスが生存していれば誤報にしない。
+
+    Web UI は起動直後の 1 回のレスポンスだけでなく、その後の状態監視ループ
+    (`fddctl -l` のポーリング) で実際の状態に追従する。
+    """
+    monkeypatch.setattr("app.backends.real._STARTUP_TIMEOUT", 0.05)
+    monkeypatch.setattr("app.backends.real._POLL_INTERVAL", 0.01)
+
+    runner.sequences[("pgrep", "-x", "fddemu")] = [NOT_FOUND]
+    runner.responses[("pgrep", "-x", "fddemu")] = _ALIVE
+    runner.default_result = _CONNECT_ERROR
+
+    await backend.start_fddemu()  # 例外が出なければ成功
+
+
 async def test_fdxconv_の引数(backend: RealFDX68Backend, runner: FakeCommandRunner):
     """変換は元ファイルを変更しないよう、入力と出力を明示的に指定する。"""
     await backend.convert_to_fdx(Path("/img/a.d88"), Path("/img/a.fdx"))
@@ -202,15 +265,16 @@ async def test_停止は_fddctl_stop_を先に試す(runner: FakeCommandRunner):
     assert not [c for c in runner.calls if "pkill" in c], "正常時に pkill を呼んでいる"
 
 
-async def test_pkill_は完全一致で呼ぶ(runner: FakeCommandRunner):
+async def test_pkill_は完全一致で呼ぶ(runner: FakeCommandRunner, monkeypatch: pytest.MonkeyPatch):
     """-x を付けないと fddemu を含む別プロセスを巻き込む恐れがある。"""
+    monkeypatch.setattr("app.backends.real._STOP_TIMEOUT", 0.05)
+    monkeypatch.setattr("app.backends.real._POLL_INTERVAL", 0.01)
+
     settings = Settings(backend="real", bin_dir=Path("/usr/local/bin"), use_sudo=True)
     backend = RealFDX68Backend(settings, runner)
 
     # fddctl --stop の後も動いたままに見せて、pkill へのフォールバックを発生させる
-    runner.responses[("pgrep", "-x", "fddemu")] = CommandResult(
-        args=["pgrep", "-x", "fddemu"], returncode=0, stdout="1234\n", stderr=""
-    )
+    runner.responses[("pgrep", "-x", "fddemu")] = _ALIVE
 
     with pytest.raises(Exception):  # noqa: B017  最終的に停止できず失敗する
         await backend.stop_fddemu()
@@ -220,3 +284,23 @@ async def test_pkill_は完全一致で呼ぶ(runner: FakeCommandRunner):
     for call in pkill_calls:
         assert "-x" in call, f"完全一致 (-x) が指定されていない: {call}"
         assert call[:2] == ["sudo", "-n"]
+
+
+async def test_停止確認が遅延しても_pkill_に落ちない(
+    runner: FakeCommandRunner, monkeypatch: pytest.MonkeyPatch
+):
+    """fddctl --stop 後、消滅確認が数回遅れても、期限内に消えれば pkill へ進まない。
+
+    メモリ逼迫下で正常に終了処理中の fddemu を pkill しないための回帰テスト。
+    """
+    monkeypatch.setattr("app.backends.real._STOP_TIMEOUT", 1.0)
+    monkeypatch.setattr("app.backends.real._POLL_INTERVAL", 0.01)
+
+    settings = Settings(backend="real", bin_dir=Path("/usr/local/bin"), use_sudo=True)
+    backend = RealFDX68Backend(settings, runner)
+
+    runner.sequences[("pgrep", "-x", "fddemu")] = [_ALIVE, _ALIVE, NOT_FOUND]
+
+    await backend.stop_fddemu()
+
+    assert not [c for c in runner.calls if "pkill" in c], "早期に消えたのに pkill している"

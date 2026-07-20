@@ -5,6 +5,7 @@
 
 import asyncio
 import logging
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 
 from app.backends.base import FDX68Backend
@@ -17,14 +18,33 @@ from app.models.image import AnalyzeMode, DataFormat, DiskInfo, DiskType
 
 logger = logging.getLogger(__name__)
 
-#: fddemu 起動後、疎通確認までに待つ秒数
-_STARTUP_WAIT = 1.0
-#: fddctl --stop の後、プロセスの消滅を確認するまでに待つ秒数
-_STOP_WAIT = 0.5
+#: fddemu の起動確認をあきらめるまでの秒数（Pi 3 A+ の実測に余裕を持たせた値）
+_STARTUP_TIMEOUT = 15.0
+#: fddemu の停止確認をあきらめ、pkill へ移行するまでの秒数
+_STOP_TIMEOUT = 5.0
+#: 起動／停止の確認ポーリング間隔
+_POLL_INTERVAL = 0.5
 #: 変換は大きなイメージだと時間がかかるため長めに取る
 _CONVERT_TIMEOUT = 300.0
 #: Web UI 自身の systemd unit 名。scripts/install.sh の SERVICE_NAME と一致させること。
 _SERVICE_UNIT = "fdx68-web.service"
+
+
+async def _poll_until(
+    condition: Callable[[], Awaitable[bool]], *, timeout: float, interval: float
+) -> bool:
+    """condition が真になるまで待つ。真になれば True、timeout に達したら False。
+
+    最初の判定は待たずに即実行する（応答が速いケースで無駄な待ちを入れないため）。
+    """
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + timeout
+    while True:
+        if await condition():
+            return True
+        if loop.time() >= deadline:
+            return False
+        await asyncio.sleep(interval)
 
 
 class RealFDX68Backend(FDX68Backend):
@@ -109,15 +129,32 @@ class RealFDX68Backend(FDX68Backend):
 
         await self._runner.spawn(args)
 
-        # 起動直後は fddctl が接続できないため少し待つ
-        await asyncio.sleep(_STARTUP_WAIT)
+        # 起動直後は fddctl が接続できないため、疎通するまでポーリングする。
+        # Pi 3 A+ ではメモリが逼迫しており、疎通までに 1 秒を超えることがある。
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + _STARTUP_TIMEOUT
+        while True:
+            status = await self.get_status()
+            if status.fddemu_running:
+                return
 
-        status = await self.get_status()
-        if not status.fddemu_running:
-            raise CommandFailed(
-                "fddemu を起動できませんでした。ログを確認してください。",
-                detail=f"args={args}",
-            )
+            if not await self.is_fddemu_running():
+                # プロセス自体が消えている場合のみ、本当の起動失敗とみなす。
+                raise CommandFailed(
+                    "fddemu を起動できませんでした。ログを確認してください。",
+                    detail=f"args={args}",
+                )
+
+            if loop.time() >= deadline:
+                # プロセスは生きているが疎通確認だけが間に合わなかったケース。
+                # 状態監視ループが後で追従するので、ここではエラーにしない。
+                logger.warning(
+                    "fddemu の起動確認がタイムアウトしましたが、プロセスは生存しています: args=%s",
+                    args,
+                )
+                return
+
+            await asyncio.sleep(_POLL_INTERVAL)
 
     async def stop_fddemu(self) -> None:
         """fddemu を停止する。
@@ -130,26 +167,27 @@ class RealFDX68Backend(FDX68Backend):
         なお fddemu がハングしている場合はソケット経由の `--stop` が効かないので、
         そのときこそ pkill が必要になる。だから残してある。
         """
+
+        async def _stopped() -> bool:
+            return not await self.is_fddemu_running()
+
         result = await self._runner.run(self._fddctl("--stop"))
         logger.info("fddctl --stop: rc=%d %s", result.returncode, result.output.strip())
 
-        await asyncio.sleep(_STOP_WAIT)
-        if not await self.is_fddemu_running():
+        if await _poll_until(_stopped, timeout=_STOP_TIMEOUT, interval=_POLL_INTERVAL):
             return
 
         # -x で完全一致。部分一致による誤爆を防ぐ。
         logger.warning("fddctl --stop で停止しなかったため pkill を使います")
         await self._runner.run(self._privileged("pkill", "-x", "fddemu"))
 
-        await asyncio.sleep(_STOP_WAIT)
-        if not await self.is_fddemu_running():
+        if await _poll_until(_stopped, timeout=_STOP_TIMEOUT, interval=_POLL_INTERVAL):
             return
 
         logger.warning("pkill でも停止しなかったため SIGKILL を送ります")
         await self._runner.run(self._privileged("pkill", "-x", "-9", "fddemu"))
 
-        await asyncio.sleep(_STOP_WAIT)
-        if await self.is_fddemu_running():
+        if not await _poll_until(_stopped, timeout=_STOP_TIMEOUT, interval=_POLL_INTERVAL):
             raise CommandFailed("fddemu を停止できませんでした。")
 
     # --- ドライブ操作 -------------------------------------------------------

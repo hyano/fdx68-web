@@ -116,6 +116,10 @@ class FakeCommandRunner(CommandRunner):
 
     #: args のタプルをキーとした応答の設定
     responses: dict[tuple[str, ...], CommandResult] = field(default_factory=dict)
+    #: args のタプルをキーとした、呼び出し順に消費される応答の列。
+    #: 「1 回目は失敗、2 回目以降は成功」のような時系列を再現するために使う。
+    #: 空になったら responses → default_result の順にフォールバックする。
+    sequences: dict[tuple[str, ...], list[CommandResult]] = field(default_factory=dict)
     #: 実行されたコマンドの履歴
     calls: list[list[str]] = field(default_factory=list)
     #: 設定がない場合に返す既定の結果
@@ -126,6 +130,9 @@ class FakeCommandRunner(CommandRunner):
     async def run(self, args: list[str], *, timeout: float = 30.0) -> CommandResult:
         self.calls.append(list(args))
         key = tuple(args)
+        queue = self.sequences.get(key)
+        if queue:
+            return queue.pop(0)
         if key in self.responses:
             return self.responses[key]
         if self.default_result is not None:
