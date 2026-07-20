@@ -21,7 +21,13 @@ import {
 /** 内部ドラッグに使う MIME タイプ。OS からのファイル投下と区別するために使う。 */
 const INTERNAL_MIME = "application/x-fdx68-paths";
 
-/** シリンダ位置が変化してから「アクセス中の可能性あり」と表示し続ける時間（ミリ秒）。 */
+/**
+ * シリンダ位置が変化してから「アクセス中の可能性あり」と表示し続ける時間（ミリ秒）。
+ *
+ * **サーバの FDX68_STATUS_INTERVAL（既定 2 秒）より長く保つこと。**
+ * シリンダ位置の変化はポーリングでしか分からないため、この窓が短いと
+ * ポーリングの合間に窓が閉じ、アクセス中でもバッジが点滅する。
+ */
 const RECENT_ACCESS_WINDOW = 3000;
 
 /**
@@ -47,7 +53,8 @@ const elements = {
 };
 
 const state = {
-  status: null,
+  /** 最新のドライブ状態（id → Drive）。イベントリスナーはここから現在値を読む */
+  drives: new Map(),
   /** ドライブごとの最終シリンダ値と、それが変化した時刻 */
   cylinderSeen: new Map(),
   uploading: false,
@@ -83,8 +90,6 @@ async function refreshPath(path) {
 // --- ドライブの表示 ---------------------------------------------------------
 
 function renderStatus(status) {
-  state.status = status;
-
   elements.emulator.dataset.running = String(status.fddemu_running);
   elements.emulatorLabel.textContent = status.fddemu_running
     ? "動作中"
@@ -97,65 +102,83 @@ function renderStatus(status) {
   tree.updateMounted(status.drives);
 }
 
+/**
+ * ドライブ表示を更新する。
+ *
+ * **カードは作り直さず、中身だけを書き換える。**
+ * アクセス中はシリンダ位置が動くたびに状態通知が届くため（既定 2 秒ごと）、
+ * 毎回作り直すとイジェクト／プロテクトボタンからフォーカスが外れてしまう。
+ * ツリー側の updateMounted と同じ方針。
+ */
 function renderDrives(drives) {
-  const template = document.getElementById("tpl-drive");
-  elements.drives.replaceChildren();
+  state.drives = new Map(drives.map((drive) => [drive.id, drive]));
 
   // 消えたドライブの記録は捨てる。fddemu の停止をまたいで古い時刻が残らないように。
-  const present = new Set(drives.map((drive) => drive.id));
   for (const id of state.cylinderSeen.keys()) {
-    if (!present.has(id)) state.cylinderSeen.delete(id);
+    if (!state.drives.has(id)) state.cylinderSeen.delete(id);
   }
 
   if (drives.length === 0) {
     const note = document.createElement("p");
     note.className = "note";
     note.textContent = "fddemu が停止しているため、ドライブ情報はありません。";
-    elements.drives.append(note);
+    elements.drives.replaceChildren(note);
     return;
   }
 
+  // ドライブの構成が変わったときだけ作り直す
+  if (!driveCardsMatch(drives)) rebuildDriveCards(drives);
+
   for (const drive of drives) {
+    noteCylinder(drive);
+    updateDriveCard(driveCard(drive.id), drive);
+  }
+}
+
+function driveCard(driveId) {
+  return elements.drives.querySelector(`.drive[data-drive="${driveId}"]`);
+}
+
+/** 現在並んでいるカードが、渡されたドライブ構成とちょうど一致するか。 */
+function driveCardsMatch(drives) {
+  const cards = [...elements.drives.querySelectorAll(".drive")];
+  return (
+    cards.length === drives.length &&
+    cards.every((card, index) => card.dataset.drive === String(drives[index].id))
+  );
+}
+
+/**
+ * カードを作り直し、イベントリスナーを張る。
+ *
+ * リスナーが閉じ込めるのは drive.id だけにして、操作時の現在値は state から読む。
+ * drive オブジェクトごと捕捉すると、差分更新でカードが残る間ずっと
+ * 古い値を握り続けることになる（プロテクトはトグルなので実害が出る）。
+ */
+function rebuildDriveCards(drives) {
+  const template = document.getElementById("tpl-drive");
+  elements.drives.replaceChildren();
+
+  for (const { id } of drives) {
     const fragment = template.content.cloneNode(true);
     const card = fragment.querySelector(".drive");
+    card.dataset.drive = String(id);
+    card.querySelector(".drive__title").textContent = `Drive ${id}`;
 
-    card.dataset.drive = String(drive.id);
-    card.dataset.state = drive.inserted ? "inserted" : "empty";
-    card.dataset.protected = String(drive.write_protected);
-    noteCylinder(drive);
-    card.dataset.access = drive.inserted
-      ? (isRecentlyAccessed(drive.id) ? "active" : "idle")
-      : "none";
-
-    card.querySelector(".drive__title").textContent = `Drive ${drive.id}`;
-    const imagePath = drive.image_relative || drive.image;
-    const imageCell = card.querySelector(".drive__image");
-    imageCell.textContent = drive.inserted ? imagePath.split("/").pop() : "（未挿入）";
-    imageCell.title = drive.inserted ? imagePath : "";
-    card.querySelector(".drive__cylinder").textContent =
-      drive.cylinder !== null && drive.cylinder !== undefined
-        ? String(drive.cylinder)
-        : (drive.cylinder_raw ?? "—");
-
-    const ejectButton = card.querySelector(".drive__eject");
-    ejectButton.disabled = !drive.inserted;
-    ejectButton.addEventListener("click", async () => {
+    card.querySelector(".drive__eject").addEventListener("click", async () => {
       try {
-        renderStatus(await api.eject(drive.id));
-        toast(`Drive ${drive.id} をイジェクトしました。`, "success", 3000);
+        renderStatus(await api.eject(id));
+        toast(`Drive ${id} をイジェクトしました。`, "success", 3000);
       } catch (error) {
         await handleError(error);
       }
     });
 
-    const protectButton = card.querySelector(".drive__protect");
-    protectButton.disabled = !drive.inserted;
-    protectButton.textContent = drive.write_protected
-      ? "プロテクト解除"
-      : "プロテクト設定";
-    protectButton.addEventListener("click", async () => {
+    card.querySelector(".drive__protect").addEventListener("click", async () => {
+      const current = state.drives.get(id);
+      if (!current) return;
       try {
-        renderStatus(await api.setProtect(drive.id, !drive.write_protected));
+        renderStatus(await api.setProtect(id, !current.write_protected));
       } catch (error) {
         await handleError(error);
       }
@@ -163,6 +186,29 @@ function renderDrives(drives) {
 
     elements.drives.append(card);
   }
+}
+
+/** 既存カードの表示を最新のドライブ状態に合わせる。 */
+function updateDriveCard(card, drive) {
+  card.dataset.state = drive.inserted ? "inserted" : "empty";
+  card.dataset.protected = String(drive.write_protected);
+  card.dataset.access = accessStateFor(drive.id, drive.inserted);
+
+  const imagePath = drive.image_relative || drive.image;
+  const imageCell = card.querySelector(".drive__image");
+  imageCell.textContent = drive.inserted ? imagePath.split("/").pop() : "（未挿入）";
+  imageCell.title = drive.inserted ? imagePath : "";
+
+  card.querySelector(".drive__cylinder").textContent =
+    drive.cylinder !== null && drive.cylinder !== undefined
+      ? String(drive.cylinder)
+      : (drive.cylinder_raw ?? "—");
+
+  card.querySelector(".drive__eject").disabled = !drive.inserted;
+
+  const protectButton = card.querySelector(".drive__protect");
+  protectButton.disabled = !drive.inserted;
+  protectButton.textContent = drive.write_protected ? "プロテクト解除" : "プロテクト設定";
 }
 
 /**
@@ -199,18 +245,22 @@ function anyDriveRecentlyAccessed() {
   return [...state.cylinderSeen.keys()].some(isRecentlyAccessed);
 }
 
+/** ACCESS バッジに出す状態。未挿入なら none。 */
+function accessStateFor(driveId, inserted) {
+  if (!inserted) return "none";
+  return isRecentlyAccessed(driveId) ? "active" : "idle";
+}
+
 /**
  * ACCESS バッジだけを現在時刻で塗り直す。
  *
- * カードの作り直しはしない。毎秒 DOM とイベントリスナを差し替えると
- * 操作中の状態を壊すため。
+ * 状態が変化しなければサーバは何も送ってこないため、
+ * アクセスが止まったことは時間の経過でしか分からない。
  */
 function refreshAccessBadges() {
   for (const card of elements.drives.querySelectorAll(".drive")) {
-    if (card.dataset.state !== "inserted") continue;
-    card.dataset.access = isRecentlyAccessed(Number(card.dataset.drive))
-      ? "active"
-      : "idle";
+    const driveId = Number(card.dataset.drive);
+    card.dataset.access = accessStateFor(driveId, card.dataset.state === "inserted");
   }
 }
 
