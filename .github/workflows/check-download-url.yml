@@ -1,0 +1,48 @@
+name: FDX68 配布 URL の死活監視
+
+# FDX68 の 64bit 版には固定 URL がなく、バージョン番号付きの URL を
+# packaging/fdx68-source.conf に直接書いている。
+# 配布側の構成が変わった場合に気付けるよう、週次で到達性だけを確認する。
+#
+# ハッシュの照合はここでは行わない。上流が同じ URL の内容を差し替えた場合、
+# それが正当な更新かどうかの判断は人間が行うべきだからである。
+
+on:
+  schedule:
+    - cron: "0 3 * * 1"  # 毎週月曜 03:00 UTC
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 配布 URL に到達できることを確認
+        run: |
+          set -euo pipefail
+          . packaging/fdx68-source.conf
+
+          failed=0
+          for arch in aarch64 armhf; do
+            eval "url=\${FDX68_URL_${arch}:-}"
+            [ -n "${url}" ] || continue
+
+            code="$(curl -s -o /dev/null -w '%{http_code}' -I --max-time 30 "${url}" || echo 000)"
+            if [ "${code}" = "200" ]; then
+              echo "OK   ${arch}: ${url}"
+            else
+              echo "NG   ${arch}: ${url} (HTTP ${code})"
+              failed=1
+            fi
+          done
+
+          if [ "${failed}" -ne 0 ]; then
+            echo ""
+            echo "FDX68 の配布 URL に到達できませんでした。"
+            echo "公式サイト http://retropc.net/gimons/fdx68/ を確認し、"
+            echo "packaging/fdx68-source.conf を更新してください。"
+            echo "手順は docs/installation.md を参照してください。"
+            exit 1
+          fi

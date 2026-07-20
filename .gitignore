@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# 設定（接続情報・環境依存の値を含むため絶対にコミットしない）
+.env
+.env.new
+.env.deploy
+
+# ログ・一時ファイル
+*.log
+*.part
+
+# ディスクイメージ（テスト用の小さなものも含めて誤コミットを防ぐ）
+*.fdx
+*.FDX
+*.d88
+*.d68
+*.d77
+*.xdf
+*.hdm
+*.2hd
+*.dim
+
+# FDX68 本体（再配布不可のため、誤って取り込まないよう明示的に除外）
+fdx68*.tar.gz
+fddemu
+fddctl
+fdxconv
+fdxtool
+fdxview
+fdxtrkcpy
+fddump
+fdrestore
+fdunformat
+fdinfo
+
+# macOS
+.DS_Store

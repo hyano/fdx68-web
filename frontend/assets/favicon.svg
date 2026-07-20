@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!--
+    5.25 インチのフロッピーディスク。
+    X68000 で使うのは 5.25 インチ 2HD なので、3.5 インチではなくこの形にしている。
+  -->
+  <rect x="2" y="2" width="28" height="28" rx="1.5" fill="#2f3542"/>
+  <rect x="4" y="4" width="24" height="24" rx="0.5" fill="#3d4454"/>
+  <!-- ハブ穴 -->
+  <circle cx="16" cy="16" r="6" fill="#22272f"/>
+  <circle cx="16" cy="16" r="3" fill="#5b9bf0"/>
+  <!-- ヘッドスロット -->
+  <rect x="13" y="22" width="6" height="7" rx="1" fill="#22272f"/>
+  <!-- インデックスホール -->
+  <circle cx="23" cy="16" r="1.2" fill="#22272f"/>
+  <!-- ライトプロテクトノッチ -->
+  <rect x="2" y="9" width="2.5" height="4" fill="#22272f"/>
+</svg>

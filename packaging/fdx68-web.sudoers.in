@@ -1,0 +1,21 @@
+# FDX68 Web Controller が必要とする root 権限の操作。
+# @USER@ は scripts/install.sh が実際のユーザー名に置き換える。
+#
+# このファイルは install.sh が visudo -c で構文検証してから設置する。
+# 構文エラーのある sudoers ファイルを置くと sudo 自体が使えなくなるため、
+# 手で編集する場合も必ず visudo を使うこと。
+#
+# アプリ本体は非 root で動作し、以下の操作だけを昇格して実行する。
+#   fddemu … /dev/mem を使うため root 必須
+#   pkill  … fddctl --stop で停止しなかった場合のフォールバック
+#   reboot / poweroff … システム操作
+#
+# 以下は**意図的に含めていない**（root 権限を必要としないため）。
+#   fddctl … 実機で確認済み。fddemu が root で動いていても非 root で接続できる
+#   fdxconv / fdxtool … ファイル操作のみで GPIO を触らない
+
+@USER@ ALL=(root) NOPASSWD: @BIN_DIR@/fddemu
+@USER@ ALL=(root) NOPASSWD: /usr/bin/pkill -x fddemu
+@USER@ ALL=(root) NOPASSWD: /usr/bin/pkill -x -9 fddemu
+@USER@ ALL=(root) NOPASSWD: /sbin/reboot
+@USER@ ALL=(root) NOPASSWD: /sbin/poweroff

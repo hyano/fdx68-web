@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FDX68 Web Controller</title>
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/css/tokens.css">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<header class="app-header">
+  <h1>FDX68 Web Controller</h1>
+  <div class="connection" id="connection" data-state="connecting">
+    <span class="connection__dot"></span>
+    <span class="connection__label">接続中…</span>
+  </div>
+</header>
+
+<main class="layout">
+
+  <!-- FDX68 の状態と fddemu の制御 -->
+  <section class="panel" id="emulator-panel">
+    <h2>FDX68</h2>
+    <div class="emulator" id="emulator" data-running="false">
+      <div class="emulator__state">
+        <span class="emulator__indicator"></span>
+        <span class="emulator__label" id="emulator-label">状態を取得しています…</span>
+      </div>
+      <div class="button-row">
+        <button type="button" id="btn-start" class="button button--primary">起動</button>
+        <button type="button" id="btn-stop" class="button">停止</button>
+      </div>
+    </div>
+    <p class="note" id="emulator-note"></p>
+  </section>
+
+  <!-- ドライブ -->
+  <section class="panel" id="drives-panel">
+    <h2>ドライブ</h2>
+    <div class="drives" id="drives"></div>
+  </section>
+
+  <!-- イメージブラウザ -->
+  <section class="panel panel--wide" id="browser-panel">
+    <div class="panel__head">
+      <h2>ディスクイメージ</h2>
+      <div class="toolbar">
+        <button type="button" id="btn-refresh" class="button" title="一覧を更新">⟳ 更新</button>
+        <button type="button" id="btn-mkdir" class="button">＋ 新規フォルダ</button>
+        <button type="button" id="btn-create" class="button">＋ 新規ディスク</button>
+        <button type="button" id="btn-upload" class="button">⬆ アップロード</button>
+        <input type="file" id="file-input" multiple hidden>
+      </div>
+    </div>
+
+    <div class="bulk-bar" id="bulk-bar" hidden>
+      <span id="bulk-count">0 件選択中</span>
+      <button type="button" id="btn-bulk-delete" class="button button--danger">削除</button>
+      <button type="button" id="btn-bulk-convert" class="button">FDX に変換</button>
+      <button type="button" id="btn-bulk-clear" class="button">選択解除</button>
+    </div>
+
+    <div class="tree-container" id="tree-container">
+      <ul class="tree" id="tree" role="tree" aria-label="ディスクイメージ"></ul>
+    </div>
+
+    <div class="uploads" id="uploads"></div>
+  </section>
+
+  <!-- システム操作 -->
+  <section class="panel" id="system-panel">
+    <h2>システム</h2>
+    <div class="button-row">
+      <button type="button" id="btn-reboot" class="button button--danger">再起動</button>
+      <button type="button" id="btn-poweroff" class="button button--danger">シャットダウン</button>
+    </div>
+    <p class="note">X68000 の動作中に実行しないでください。</p>
+  </section>
+
+</main>
+
+<div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+
+<!--
+  マークアップはすべて template に置く。
+  JS は cloneNode して値を埋めるだけにし、見た目は CSS が決める。
+  詳細は docs/ui-guidelines.md を参照。
+-->
+
+<template id="tpl-drive">
+  <article class="drive" data-drive="" data-state="empty" data-recent="false">
+    <header class="drive__head">
+      <h3 class="drive__title"></h3>
+      <span class="drive__badge drive__badge--wp">WP</span>
+    </header>
+    <dl class="drive__info">
+      <dt>イメージ</dt>
+      <dd class="drive__image">—</dd>
+      <dt>シリンダ</dt>
+      <dd class="drive__cylinder">—</dd>
+    </dl>
+    <p class="drive__warning">X68000 がディスクにアクセス中の可能性があります。</p>
+    <div class="button-row">
+      <button type="button" class="button drive__eject">排出</button>
+      <button type="button" class="button drive__protect">プロテクト切替</button>
+    </div>
+  </article>
+</template>
+
+<template id="tpl-node">
+  <li class="node" role="treeitem" data-kind="" data-path="" data-mounted="" data-selected="false">
+    <div class="node__row">
+      <button type="button" class="node__twisty" aria-hidden="true"></button>
+      <span class="node__icon"></span>
+      <span class="node__name"></span>
+      <span class="node__mounted"></span>
+      <span class="node__size"></span>
+      <span class="node__mtime"></span>
+      <span class="node__actions">
+        <button type="button" class="button button--small node__insert0">D0</button>
+        <button type="button" class="button button--small node__insert1">D1</button>
+        <button type="button" class="button button--small node__convert">変換</button>
+        <details class="menu">
+          <summary class="button button--small">⋯</summary>
+          <div class="menu__items">
+            <button type="button" class="menu__item node__info">情報</button>
+            <button type="button" class="menu__item node__attrs">ディスク属性</button>
+            <button type="button" class="menu__item node__duplicate">複製</button>
+            <button type="button" class="menu__item node__download">ダウンロード</button>
+            <button type="button" class="menu__item node__rename">名前変更</button>
+            <button type="button" class="menu__item menu__item--danger node__delete">削除</button>
+          </div>
+        </details>
+      </span>
+    </div>
+    <ul class="node__children" role="group" hidden></ul>
+  </li>
+</template>
+
+<template id="tpl-upload">
+  <div class="upload">
+    <span class="upload__name"></span>
+    <progress class="upload__progress" max="100" value="0"></progress>
+    <span class="upload__status"></span>
+  </div>
+</template>
+
+<template id="tpl-toast">
+  <div class="toast" data-level="info">
+    <span class="toast__message"></span>
+    <button type="button" class="toast__close" aria-label="閉じる">×</button>
+  </div>
+</template>
+
+<!-- ダイアログ -->
+
+<dialog class="dialog" id="dialog-prompt">
+  <form method="dialog">
+    <h3 id="prompt-title"></h3>
+    <p class="dialog__note" id="prompt-note"></p>
+    <label>
+      <span id="prompt-label">名前</span>
+      <input type="text" id="prompt-input" required>
+    </label>
+    <menu class="dialog__buttons">
+      <button type="submit" value="cancel" class="button">キャンセル</button>
+      <button type="submit" value="ok" class="button button--primary" id="prompt-ok">OK</button>
+    </menu>
+  </form>
+</dialog>
+
+<dialog class="dialog" id="dialog-confirm">
+  <form method="dialog">
+    <h3 id="confirm-title"></h3>
+    <p id="confirm-message"></p>
+    <p class="dialog__note" id="confirm-note"></p>
+    <menu class="dialog__buttons">
+      <button type="submit" value="cancel" class="button">キャンセル</button>
+      <button type="submit" value="ok" class="button button--danger" id="confirm-ok">実行</button>
+    </menu>
+  </form>
+</dialog>
+
+<dialog class="dialog" id="dialog-create">
+  <form method="dialog">
+    <h3>新規ディスクイメージ</h3>
+    <p class="dialog__note">
+      作成されるのは<strong>未フォーマットのブランクディスク</strong>です。
+      使用前に X68000 側で <code>FORMAT.X</code> によるフォーマットが必要です。
+    </p>
+    <label>
+      <span>ファイル名</span>
+      <input type="text" id="create-name" required placeholder="newdisk">
+    </label>
+    <label>
+      <span>ディスク種別</span>
+      <select id="create-type">
+        <option value="2HD" selected>2HD（X68000 標準・360rpm）</option>
+        <option value="2DD">2DD（300rpm）</option>
+        <option value="2D">2D（300rpm）</option>
+      </select>
+    </label>
+    <label>
+      <span>ディスク名（任意）</span>
+      <input type="text" id="create-diskname" placeholder="BLANK IMAGE">
+    </label>
+    <details class="advanced">
+      <summary>詳細オプション</summary>
+      <label class="checkbox">
+        <input type="checkbox" id="create-protect">
+        <span>ライトプロテクトを有効にする</span>
+      </label>
+      <label>
+        <span>データ形式</span>
+        <select id="create-format">
+          <option value="encode" selected>encode（通常）</option>
+          <option value="raw">raw</option>
+        </select>
+      </label>
+    </details>
+    <menu class="dialog__buttons">
+      <button type="submit" value="cancel" class="button">キャンセル</button>
+      <button type="submit" value="ok" class="button button--primary">作成</button>
+    </menu>
+  </form>
+</dialog>
+
+<dialog class="dialog" id="dialog-attrs">
+  <form method="dialog">
+    <h3>ディスク属性の編集</h3>
+    <p class="dialog__note">
+      これは <strong>FDX ファイル自体の属性</strong>です。
+      ドライブの実行時プロテクトとは別物で、ファイルに永続します。
+    </p>
+    <label>
+      <span>ディスク名</span>
+      <input type="text" id="attrs-diskname">
+    </label>
+    <label class="checkbox">
+      <input type="checkbox" id="attrs-protect">
+      <span>ライトプロテクトを有効にする</span>
+    </label>
+    <menu class="dialog__buttons">
+      <button type="submit" value="cancel" class="button">キャンセル</button>
+      <button type="submit" value="ok" class="button button--primary">保存</button>
+    </menu>
+  </form>
+</dialog>
+
+<dialog class="dialog dialog--wide" id="dialog-convert">
+  <form method="dialog">
+    <h3>FDX に変換</h3>
+    <p class="dialog__note" id="convert-target"></p>
+    <label id="convert-diskno-row">
+      <span>ディスク番号（D88/D68/D77 のマルチイメージ）</span>
+      <input type="number" id="convert-diskno" value="1" min="1">
+    </label>
+    <details class="advanced">
+      <summary>詳細オプション</summary>
+      <label>
+        <span>データ形式</span>
+        <select id="convert-format">
+          <option value="encode" selected>encode（通常）</option>
+          <option value="raw">raw</option>
+        </select>
+      </label>
+      <label>
+        <span>解析モード</span>
+        <select id="convert-analyze">
+          <option value="upd765" selected>upd765（X68000・NEC 系）</option>
+          <option value="mb8877">mb8877（FM 系・X1 系）</option>
+        </select>
+      </label>
+    </details>
+    <menu class="dialog__buttons">
+      <button type="submit" value="cancel" class="button">キャンセル</button>
+      <button type="submit" value="ok" class="button button--primary">変換</button>
+    </menu>
+  </form>
+</dialog>
+
+<dialog class="dialog dialog--wide" id="dialog-info">
+  <form method="dialog">
+    <h3>ディスク情報</h3>
+    <div id="info-body"></div>
+    <menu class="dialog__buttons">
+      <button type="submit" value="ok" class="button button--primary">閉じる</button>
+    </menu>
+  </form>
+</dialog>
+
+<script type="module" src="/js/app.js"></script>
+</body>
+</html>

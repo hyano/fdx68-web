@@ -1,0 +1,479 @@
+/*
+ * 見た目はすべてここで決める。JS からインライン style を書かないこと。
+ * 状態は data-* 属性として出力されるので、それをセレクタで拾う。
+ */
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--font-size);
+  color: var(--color-text);
+  background: var(--color-bg);
+  line-height: 1.6;
+}
+
+h1, h2, h3 { margin: 0; font-weight: 600; }
+h1 { font-size: 1.1rem; }
+h2 { font-size: 0.95rem; }
+h3 { font-size: 0.9rem; }
+
+code { font-family: var(--font-mono); font-size: 0.9em; }
+
+/* --- ヘッダ --------------------------------------------------------------- */
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.connection {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--font-size-small);
+  color: var(--color-text-weak);
+}
+
+.connection__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-stopped);
+}
+
+.connection[data-state="open"] .connection__dot { background: var(--color-success); }
+.connection[data-state="closed"] .connection__dot { background: var(--color-danger); }
+
+/* --- レイアウト ----------------------------------------------------------- */
+
+.layout {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: var(--space-lg);
+  padding: var(--space-lg);
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.panel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-lg);
+  box-shadow: var(--shadow-panel);
+}
+
+.panel--wide { grid-column: 1 / -1; }
+
+.panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.note {
+  margin: var(--space-sm) 0 0;
+  font-size: var(--font-size-small);
+  color: var(--color-text-weak);
+}
+
+/* --- ボタン --------------------------------------------------------------- */
+
+.button {
+  font: inherit;
+  padding: var(--space-xs) var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.button:hover:not(:disabled) { border-color: var(--color-accent); }
+.button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.button--primary {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-text-inverse);
+}
+.button--primary:hover:not(:disabled) { background: var(--color-accent-hover); }
+
+.button--danger {
+  background: var(--color-danger);
+  border-color: var(--color-danger);
+  color: var(--color-text-inverse);
+}
+.button--danger:hover:not(:disabled) { background: var(--color-danger-hover); }
+
+.button--small {
+  padding: 0 var(--space-sm);
+  font-size: var(--font-size-small);
+}
+
+.button-row { display: flex; gap: var(--space-sm); flex-wrap: wrap; }
+.toolbar { display: flex; gap: var(--space-sm); flex-wrap: wrap; }
+
+/* --- fddemu の状態 -------------------------------------------------------- */
+
+.emulator {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+}
+
+.emulator__state { display: flex; align-items: center; gap: var(--space-sm); }
+
+.emulator__indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color-stopped);
+}
+
+.emulator[data-running="true"] .emulator__indicator { background: var(--color-running); }
+.emulator[data-running="true"] #btn-start { display: none; }
+.emulator[data-running="false"] #btn-stop { display: none; }
+
+/* --- ドライブ ------------------------------------------------------------- */
+
+.drives { display: grid; gap: var(--space-md); }
+
+.drive {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-md);
+  background: var(--color-surface-alt);
+}
+
+.drive__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-sm);
+}
+
+.drive__badge {
+  font-size: var(--font-size-small);
+  padding: 0 var(--space-sm);
+  border-radius: var(--radius-sm);
+  background: var(--color-border);
+  color: var(--color-text-weak);
+}
+
+/* ライトプロテクトが有効なときだけ目立たせる */
+.drive[data-protected="true"] .drive__badge--wp {
+  background: var(--color-warning);
+  color: var(--color-text-inverse);
+}
+
+.drive__info {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-xs) var(--space-md);
+  margin: 0;
+  font-size: var(--font-size-small);
+}
+
+.drive__info dt { color: var(--color-text-weak); }
+.drive__info dd { margin: 0; overflow-wrap: anywhere; }
+
+.drive__image { font-family: var(--font-mono); }
+
+/* 挿入中のドライブを目立たせる */
+.drive[data-state="inserted"] { border-color: var(--color-mounted); }
+
+/* シリンダ位置が最近変化した＝X68000 がアクセスした可能性がある */
+.drive__warning {
+  display: none;
+  margin: var(--space-sm) 0 0;
+  font-size: var(--font-size-small);
+  color: var(--color-warning);
+}
+.drive[data-recent="true"] .drive__warning { display: block; }
+
+.drive[data-state="empty"] .drive__eject,
+.drive[data-state="empty"] .drive__protect { display: none; }
+
+/* --- ツリー --------------------------------------------------------------- */
+
+.tree-container {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  min-height: 200px;
+  max-height: 60vh;
+  overflow: auto;
+  padding: var(--space-sm);
+}
+
+/* ドラッグ中のドロップ先を明示する */
+.tree-container[data-dragover="true"] {
+  border-color: var(--color-drop);
+  background: var(--color-drop-bg);
+}
+
+.tree, .node__children { list-style: none; margin: 0; padding: 0; }
+.node__children { padding-left: var(--indent); }
+
+.node__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 2px var(--space-xs);
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+}
+
+.node__row:hover { background: var(--color-surface-alt); }
+
+.node[data-selected="true"] > .node__row { background: var(--color-selected-bg); }
+
+/* 移動のドロップ先になっているフォルダ行 */
+.node[data-droptarget="true"] > .node__row {
+  border-color: var(--color-drop);
+  background: var(--color-drop-bg);
+}
+
+.node__twisty {
+  width: var(--twisty-size);
+  height: var(--twisty-size);
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-text-weak);
+  cursor: pointer;
+  flex: none;
+}
+
+/* 開閉の三角。ディレクトリ以外では出さない */
+.node[data-kind="directory"] > .node__row .node__twisty::before { content: "▶"; }
+.node[data-kind="directory"][data-expanded="true"] > .node__row .node__twisty::before { content: "▼"; }
+
+.node__icon { font-size: var(--icon-size); flex: none; }
+.node__name { overflow-wrap: anywhere; }
+
+/*
+ * 変換が必要なイメージのバッジ。
+ * JS はバッジの DOM を作らない。data-kind から CSS が生成する。
+ */
+.node[data-kind="convertible_image"] > .node__row .node__name::after {
+  content: "要変換";
+  margin-left: var(--space-sm);
+  padding: 0 var(--space-xs);
+  font-size: 10px;
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius-sm);
+  color: var(--color-warning);
+  white-space: nowrap;
+}
+
+/* 挿入中のイメージに印を付ける */
+.node__mounted { font-size: var(--font-size-small); color: var(--color-mounted); }
+.node[data-mounted=""] > .node__row .node__mounted { display: none; }
+.node:not([data-mounted=""]) > .node__row {
+  background: var(--color-mounted-bg);
+}
+
+.node__size, .node__mtime {
+  margin-left: auto;
+  font-size: var(--font-size-small);
+  color: var(--color-text-weak);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.node__mtime { margin-left: 0; }
+
+.node__actions {
+  display: flex;
+  gap: var(--space-xs);
+  align-items: center;
+  flex: none;
+}
+
+/* 種別ごとに出す操作を変える */
+.node[data-kind="directory"] .node__insert0,
+.node[data-kind="directory"] .node__insert1,
+.node[data-kind="directory"] .node__convert,
+.node[data-kind="unsupported"] .node__insert0,
+.node[data-kind="unsupported"] .node__insert1,
+.node[data-kind="unsupported"] .node__convert,
+.node[data-kind="convertible_image"] .node__insert0,
+.node[data-kind="convertible_image"] .node__insert1,
+.node[data-kind="fdx"] .node__convert { display: none; }
+
+.node[data-kind="directory"] .node__info,
+.node[data-kind="directory"] .node__attrs,
+.node[data-kind="directory"] .node__duplicate,
+.node[data-kind="directory"] .node__download,
+.node:not([data-kind="fdx"]) .node__info,
+.node:not([data-kind="fdx"]) .node__attrs { display: none; }
+
+/* --- メニュー ------------------------------------------------------------- */
+
+.menu { position: relative; }
+.menu summary { list-style: none; cursor: pointer; }
+.menu summary::-webkit-details-marker { display: none; }
+
+.menu__items {
+  position: absolute;
+  right: 0;
+  z-index: 10;
+  min-width: 10rem;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-panel);
+}
+
+.menu__item {
+  font: inherit;
+  text-align: left;
+  padding: var(--space-xs) var(--space-md);
+  border: none;
+  background: none;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.menu__item:hover { background: var(--color-surface-alt); }
+.menu__item--danger { color: var(--color-danger); }
+
+/* --- 一括操作 ------------------------------------------------------------- */
+
+.bulk-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+  padding: var(--space-sm);
+  background: var(--color-selected-bg);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-small);
+}
+
+/* --- アップロード --------------------------------------------------------- */
+
+.uploads { display: grid; gap: var(--space-xs); margin-top: var(--space-md); }
+
+.upload {
+  display: grid;
+  grid-template-columns: 1fr 8rem auto;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--font-size-small);
+}
+
+.upload__name { overflow-wrap: anywhere; }
+.upload__progress { width: 100%; }
+
+/* --- ダイアログ ----------------------------------------------------------- */
+
+.dialog {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  padding: var(--space-lg);
+  min-width: min(24rem, 90vw);
+  box-shadow: var(--shadow-dialog);
+}
+
+.dialog--wide { min-width: min(36rem, 92vw); }
+.dialog::backdrop { background: rgba(0, 0, 0, 0.4); }
+
+.dialog form { display: grid; gap: var(--space-md); }
+.dialog label { display: grid; gap: var(--space-xs); font-size: var(--font-size-small); }
+.dialog label.checkbox { grid-auto-flow: column; justify-content: start; align-items: center; }
+
+.dialog input[type="text"],
+.dialog input[type="number"],
+.dialog select {
+  font: inherit;
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.dialog__note {
+  margin: 0;
+  padding: var(--space-sm);
+  font-size: var(--font-size-small);
+  background: var(--color-surface-alt);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-weak);
+}
+
+.dialog__buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+  margin: 0;
+  padding: 0;
+}
+
+.advanced summary { cursor: pointer; font-size: var(--font-size-small); color: var(--color-text-weak); }
+.advanced { display: grid; gap: var(--space-sm); }
+
+.info-table { width: 100%; border-collapse: collapse; font-size: var(--font-size-small); }
+.info-table th { text-align: left; color: var(--color-text-weak); padding-right: var(--space-md); font-weight: normal; }
+.info-table td { font-family: var(--font-mono); }
+
+.info-raw {
+  max-height: 40vh;
+  overflow: auto;
+  padding: var(--space-sm);
+  background: var(--color-surface-alt);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-small);
+  white-space: pre-wrap;
+}
+
+/* --- トースト ------------------------------------------------------------- */
+
+.toasts {
+  position: fixed;
+  right: var(--space-lg);
+  bottom: var(--space-lg);
+  display: grid;
+  gap: var(--space-sm);
+  z-index: 100;
+  max-width: min(28rem, 90vw);
+}
+
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-sm);
+  border-left: 4px solid var(--color-accent);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-dialog);
+  font-size: var(--font-size-small);
+}
+
+.toast[data-level="error"] { border-left-color: var(--color-danger); }
+.toast[data-level="success"] { border-left-color: var(--color-success); }
+.toast[data-level="warning"] { border-left-color: var(--color-warning); }
+
+.toast__message { flex: 1; overflow-wrap: anywhere; }
+.toast__close { border: none; background: none; cursor: pointer; color: var(--color-text-weak); font-size: 1rem; }
+
+.empty-note { padding: var(--space-md); color: var(--color-text-weak); font-size: var(--font-size-small); }

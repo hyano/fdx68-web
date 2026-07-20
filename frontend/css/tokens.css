@@ -1,0 +1,90 @@
+/*
+ * デザイントークン。
+ *
+ * 色・余白・サイズはすべてここで定義し、style.css は必ずこの変数を参照する。
+ * 将来のテーマ変更（X68000 のグレー筐体風、ダークテーマ等）を
+ * このファイルの差し替えだけで済ませるため。
+ */
+
+:root {
+  /* 背景と面 */
+  --color-bg: #f4f5f7;
+  --color-surface: #ffffff;
+  --color-surface-alt: #eef0f4;
+  --color-border: #d6d9e0;
+
+  /* 文字 */
+  --color-text: #1c2430;
+  --color-text-weak: #5d6675;
+  --color-text-inverse: #ffffff;
+
+  /* アクセント */
+  --color-accent: #2f6fd0;
+  --color-accent-hover: #2559ab;
+  --color-danger: #c0392b;
+  --color-danger-hover: #9c2d22;
+  --color-success: #2e8b57;
+  --color-warning: #b8860b;
+
+  /* 状態 */
+  --color-running: #2e8b57;
+  --color-stopped: #8a919e;
+  --color-mounted: #2f6fd0;
+  --color-mounted-bg: #e6efff;
+  --color-drop: #2f6fd0;
+  --color-drop-bg: #e6efff;
+  --color-selected-bg: #dde7f7;
+
+  /* 余白 */
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 0.75rem;
+  --space-lg: 1.25rem;
+  --space-xl: 2rem;
+
+  /* 角丸 */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+
+  /* アイコン */
+  --icon-size: 1.15rem;
+  --twisty-size: 1rem;
+
+  /* ツリーのインデント幅 */
+  --indent: 1.25rem;
+
+  /* 文字 */
+  --font-ui: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-size: 14px;
+  --font-size-small: 12px;
+
+  /* 影 */
+  --shadow-panel: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-dialog: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #1b1f27;
+    --color-surface: #242932;
+    --color-surface-alt: #2c323d;
+    --color-border: #3a414e;
+
+    --color-text: #e6e9ef;
+    --color-text-weak: #a0a8b6;
+
+    --color-accent: #5b9bf0;
+    --color-accent-hover: #7db0f5;
+    --color-danger: #e05c4c;
+    --color-danger-hover: #ec7566;
+
+    --color-mounted: #5b9bf0;
+    --color-mounted-bg: #29354a;
+    --color-drop: #5b9bf0;
+    --color-drop-bg: #29354a;
+    --color-selected-bg: #313b4c;
+
+    --shadow-panel: 0 1px 3px rgba(0, 0, 0, 0.4);
+  }
+}

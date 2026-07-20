@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: テスト（Python ${{ matrix.python-version }}）
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.11 は Raspberry Pi OS Bookworm、3.13 は Trixie 相当。
+        # 3.11 を含めるのは、Bookworm で動かない構文を使う事故を防ぐため。
+        python-version: ["3.11", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: 依存パッケージの導入
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e '.[dev]'
+
+      - name: Unit Test
+        run: pytest tests/unit -q
+
+      - name: Integration Test
+        env:
+          # 実機のコマンドを呼ばないよう mock を強制する
+          FDX68_BACKEND: mock
+        run: pytest tests/integration -q
+
+      - name: 静的解析（ruff）
+        run: |
+          ruff check .
+          ruff format --check .
+
+  shell:
+    name: シェルスクリプトの検査
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: shellcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+          shellcheck scripts/*.sh
+
+      - name: install.sh の dry-run
+        # 実際には何も変更しないことと、分岐が壊れていないことを確認する
+        run: ./scripts/install.sh --dry-run

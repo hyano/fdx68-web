@@ -1,0 +1,88 @@
+name: 不具合の報告
+description: 動作しない、想定と違う挙動をする場合はこちら
+labels: ["bug"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        報告ありがとうございます。
+
+        環境によって挙動が変わることが多いため、下記の情報をお願いします。
+        **ログに接続情報やパスワードが含まれていないか確認してから貼り付けてください。**
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: 何が起きましたか
+      description: 実際の挙動と、期待していた挙動を書いてください
+      placeholder: |
+        Drive 0 にイメージを挿入しようとすると「...」というエラーが出ます。
+        本来は挿入できるはずです。
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 再現手順
+      placeholder: |
+        1. Web UI を開く
+        2. fddemu を起動する
+        3. ツリーから disk1.fdx の「D0」を押す
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Raspberry Pi OS のバージョン
+      description: "`cat /etc/os-release | head -2` の結果"
+      placeholder: 'PRETTY_NAME="Debian GNU/Linux 12 (bookworm)"'
+    validations:
+      required: true
+
+  - type: input
+    id: model
+    attributes:
+      label: Raspberry Pi のモデル
+      description: "`cat /proc/device-tree/model` の結果"
+      placeholder: Raspberry Pi 3 Model A Plus Rev 1.0
+    validations:
+      required: true
+
+  - type: input
+    id: fdx68-version
+    attributes:
+      label: FDX68 のバージョン
+      description: "`fddemu -h | head -1` の結果"
+      placeholder: FDX68 version 2.1.0(Jun  5 2026, 12:51:07)
+    validations:
+      required: true
+
+  - type: textarea
+    id: fddctl
+    attributes:
+      label: fddctl -l の出力
+      description: |
+        ドライブの状態に関する不具合では特に重要です。
+        出力形式の差異が原因であることが多いため、そのまま貼り付けてください。
+      render: text
+      placeholder: |
+        ----+----+----+----------------------------------------
+         ID | WP | CL | DISK IMAGE
+        ----+----+----+----------------------------------------
+          0 | -- | 00 | EMPTY
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: サービスのログ
+      description: "`sudo journalctl -u fdx68-web -n 50 --no-pager` の該当部分"
+      render: text
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: 補足
+      description: 接続している実機（X68000 等）、使用しているディスクイメージの形式など
