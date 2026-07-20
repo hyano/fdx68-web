@@ -243,6 +243,14 @@ code { font-family: var(--font-mono); font-size: 0.9em; }
 
 /* --- ツリー --------------------------------------------------------------- */
 
+/*
+ * 行の文字を範囲選択できないようにしている。
+ * 複数選択は shift / meta / ctrl + クリックだが、ブラウザは同じ操作を
+ * キャレットの範囲拡張としても解釈するため、放っておくと間の行の文字が
+ * まとめて選択される。その状態で行を掴むと、ブラウザは draggable な li では
+ * なく「選択範囲」をドラッグしてしまい、掴んでいない行まで一緒に運ばれている
+ * ように見える。行を掴んだら必ずその行がドラッグ対象になるようにする。
+ */
 .tree-container {
   flex: 1 1 auto;
   min-height: 0;
@@ -250,6 +258,8 @@ code { font-family: var(--font-mono); font-size: 0.9em; }
   border-radius: var(--radius-sm);
   overflow: auto;
   padding: var(--space-sm);
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 /* ドラッグ中のドロップ先を明示する */

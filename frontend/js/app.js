@@ -716,6 +716,11 @@ elements.tree.addEventListener("dragstart", (event) => {
 
   event.dataTransfer.setData(INTERNAL_MIME, JSON.stringify(paths));
   event.dataTransfer.effectAllowed = "copyMove";
+
+  // ゴーストは掴んだ行だけにする。draggable な li は node__children を
+  // 内包しているので、既定のままだと展開済みフォルダの中身まで写り込む。
+  const row = node.querySelector(".node__row");
+  if (row) event.dataTransfer.setDragImage(row, 0, 0);
 });
 
 function clearDropTargets() {
