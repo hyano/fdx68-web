@@ -827,7 +827,8 @@ async function uploadFiles(destDir, files) {
 
       const entry = result?.results?.[0];
       if (entry && !entry.success) {
-        status.textContent = entry.message ?? "失敗";
+        // 失敗はトーストだけで伝える。進捗行を残すと同じ文言が二重に出たままになる。
+        row.remove();
         toast(`${file.name}: ${entry.message}`, "error", 0);
       } else {
         progress.value = 100;
@@ -835,7 +836,7 @@ async function uploadFiles(destDir, files) {
         setTimeout(() => row.remove(), 4000);
       }
     } catch (error) {
-      status.textContent = "失敗";
+      row.remove();
       toast(`${file.name}: ${error.message}`, "error", 0);
     }
   }
