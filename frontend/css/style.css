@@ -265,19 +265,40 @@ code { font-family: var(--font-mono); font-size: 0.9em; }
   display: flex;
   align-items: center;
   gap: var(--space-sm);
-  padding: 2px var(--space-xs);
+  padding: 2px var(--space-sm);
   border-radius: var(--radius-sm);
   border: 1px solid transparent;
 }
 
+/*
+ * 行の状態は「背景＋枠線」と「左端の帯」の 2 系統に分けている。
+ * 選択（一時的な操作対象）は前者、挿入中（実機の状態）は後者。
+ * 同じ背景色を奪い合うと、挿入中の行を選択したときに変化が見えなくなる。
+ *
+ * 背景を使う 3 つは詳細度が同じなので、記述順が優先順位になる。
+ * ホバー ＜ 選択中 ＜ ドロップ先 の順に並べること。
+ */
 .node__row:hover { background: var(--color-surface-alt); }
 
-.node[data-selected="true"] > .node__row { background: var(--color-selected-bg); }
+.node[data-selected="true"] > .node__row {
+  background: var(--color-selected-bg);
+  border-color: var(--color-selected-border);
+}
+.node[data-selected="true"] > .node__row:hover {
+  background: var(--color-selected-bg-hover);
+}
 
 /* 移動のドロップ先になっているフォルダ行 */
 .node[data-droptarget="true"] > .node__row {
   border-color: var(--color-drop);
   background: var(--color-drop-bg);
+}
+
+/* キーボード操作時の現在行。選択中の背景と紛れないよう外側に出す */
+.node:focus { outline: none; }
+.node:focus-visible > .node__row {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
 }
 
 .node__twisty {
@@ -324,8 +345,12 @@ code { font-family: var(--font-mono); font-size: 0.9em; }
 /* 挿入中のイメージに印を付ける */
 .node__mounted { font-size: var(--font-size-small); color: var(--color-mounted); }
 .node[data-mounted=""] > .node__row .node__mounted { display: none; }
+/*
+ * 背景ではなく左端の帯にしているのは、背景を選択の表現に譲るため。
+ * border-left にすると、ドロップ先が使う枠線と競合する。
+ */
 .node:not([data-mounted=""]) > .node__row {
-  background: var(--color-mounted-bg);
+  box-shadow: inset 3px 0 0 var(--color-mounted);
 }
 
 .node__size, .node__mtime {

@@ -30,10 +30,13 @@
   --color-running: #2e8b57;
   --color-stopped: #8a919e;
   --color-mounted: #2f6fd0;
-  --color-mounted-bg: #e6efff;
   --color-drop: #2f6fd0;
   --color-drop-bg: #e6efff;
-  --color-selected-bg: #dde7f7;
+  /* 選択は背景＋枠線で示す。挿入中は左端の帯なので表現がぶつからない */
+  --color-selected-bg: #cfdff5;
+  --color-selected-bg-hover: #bed3f2;
+  --color-selected-border: #2f6fd0;
+  --color-focus: #2f6fd0;
 
   /* 余白 */
   --space-xs: 0.25rem;
@@ -78,12 +81,16 @@
     --color-accent-hover: #7db0f5;
     --color-danger: #e05c4c;
     --color-danger-hover: #ec7566;
+    /* 暗い背景では #b8860b が沈むため、明度を上げた黄土色にする */
+    --color-warning: #d9a441;
 
     --color-mounted: #5b9bf0;
-    --color-mounted-bg: #29354a;
     --color-drop: #5b9bf0;
     --color-drop-bg: #29354a;
-    --color-selected-bg: #313b4c;
+    --color-selected-bg: #35435c;
+    --color-selected-bg-hover: #3f5170;
+    --color-selected-border: #5b9bf0;
+    --color-focus: #7db0f5;
 
     --shadow-panel: 0 1px 3px rgba(0, 0, 0, 0.4);
   }

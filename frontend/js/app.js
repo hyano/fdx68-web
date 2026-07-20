@@ -413,17 +413,15 @@ elements.tree.addEventListener("keydown", async (event) => {
   const node = event.target.closest(".node");
   if (!node) return;
 
-  const visible = [...elements.tree.querySelectorAll(".node")].filter(
-    (candidate) => candidate.offsetParent !== null
-  );
+  const visible = tree.visibleNodes();
   const index = visible.indexOf(node);
 
   if (event.key === "ArrowDown" && index < visible.length - 1) {
     event.preventDefault();
-    visible[index + 1].focus();
+    tree.focusNode(visible[index + 1]);
   } else if (event.key === "ArrowUp" && index > 0) {
     event.preventDefault();
-    visible[index - 1].focus();
+    tree.focusNode(visible[index - 1]);
   } else if (event.key === "ArrowRight" && node.dataset.kind === "directory") {
     event.preventDefault();
     if (node.dataset.expanded !== "true") await tree.expand(node);

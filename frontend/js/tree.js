@@ -102,6 +102,15 @@ export class ImageTree {
   }
 
   async renderInto(container, path) {
+    try {
+      await this.renderEntries(container, path);
+    } finally {
+      // 行が増減すれば Tab の受け口も作り直す必要がある
+      this.syncTabStop();
+    }
+  }
+
+  async renderEntries(container, path) {
     let listing;
     try {
       listing = await api.list(path);
@@ -158,6 +167,37 @@ export class ImageTree {
     return node;
   }
 
+  // --- キーボード操作 -----------------------------------------------------
+
+  /**
+   * 表示中のノードのうち 1 つだけを Tab の受け口にする（roving tabindex）。
+   * 全行が tabindex="0" だと、ツリーを抜けるのに行数ぶん Tab を押すことになる。
+   */
+  syncTabStop() {
+    const visible = this.visibleNodes();
+    // 受け口が残っていればそのまま。消えた（折りたたまれた等）なら先頭に戻す。
+    this.setTabStop(visible.find((node) => node.tabIndex === 0) ?? visible[0]);
+  }
+
+  setTabStop(stop) {
+    for (const node of this.root.querySelectorAll(".node")) {
+      node.tabIndex = node === stop ? 0 : -1;
+    }
+  }
+
+  /** 折りたたまれた枝を除いた、画面に出ているノードを上から順に返す。 */
+  visibleNodes() {
+    return [...this.root.querySelectorAll(".node")].filter(
+      (node) => node.offsetParent !== null
+    );
+  }
+
+  /** 指定したノードへ Tab の受け口を移してフォーカスする。 */
+  focusNode(node) {
+    this.setTabStop(node);
+    node.focus();
+  }
+
   findNode(path) {
     return this.root.querySelector(`.node[data-path="${CSS.escape(path)}"]`);
   }
@@ -167,6 +207,7 @@ export class ImageTree {
     if (node) node.remove();
     this.expanded.delete(path);
     this.saveExpanded();
+    this.syncTabStop();
   }
 
   // --- 開閉 ---------------------------------------------------------------
@@ -205,6 +246,8 @@ export class ImageTree {
     children.hidden = true;
     this.expanded.delete(node.dataset.path);
     this.saveExpanded();
+    // 受け口だった子が隠れた場合に備えて付け替える
+    this.syncTabStop();
   }
 
   // --- 更新 ---------------------------------------------------------------

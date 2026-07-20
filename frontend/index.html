@@ -116,7 +116,8 @@
 </template>
 
 <template id="tpl-node">
-  <li class="node" role="treeitem" data-kind="" data-path="" data-mounted="" data-selected="false">
+  <!-- tabindex は roving tabindex（tree.js の syncTabStop）が付け替える -->
+  <li class="node" role="treeitem" tabindex="-1" data-kind="" data-path="" data-mounted="" data-selected="false">
     <div class="node__row">
       <button type="button" class="node__twisty" aria-hidden="true"></button>
       <span class="node__icon"></span>
