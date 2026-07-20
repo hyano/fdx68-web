@@ -146,7 +146,7 @@ export class ImageTree {
       node.setAttribute("aria-expanded", "false");
     }
 
-    node.querySelector(".node__icon").textContent = iconFor(entry.kind);
+    this.applyIcon(node);
     node.querySelector(".node__name").textContent = entry.name;
     node.querySelector(".node__size").textContent = formatSize(entry.size);
     node.querySelector(".node__mtime").textContent = formatTime(entry.mtime);
@@ -157,6 +157,13 @@ export class ImageTree {
     node.querySelector(".node__mounted").textContent = mountedLabel;
 
     return node;
+  }
+
+  /** 行のアイコンを、種別と現在の開閉状態から描き直す。 */
+  applyIcon(node) {
+    node.querySelector(".node__icon").textContent = iconFor(node.dataset.kind, {
+      expanded: node.dataset.expanded === "true",
+    });
   }
 
   // --- キーボード操作 -----------------------------------------------------
@@ -232,6 +239,7 @@ export class ImageTree {
 
     node.dataset.expanded = "true";
     node.setAttribute("aria-expanded", "true");
+    this.applyIcon(node);
     children.hidden = false;
 
     // 展開のたびに必ず取り直す。
@@ -248,6 +256,7 @@ export class ImageTree {
     const children = node.querySelector(".node__children");
     node.dataset.expanded = "false";
     node.setAttribute("aria-expanded", "false");
+    this.applyIcon(node);
     children.hidden = true;
     this.expanded.delete(node.dataset.path);
     this.saveExpanded();
