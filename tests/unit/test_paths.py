@@ -10,6 +10,7 @@ import pytest
 
 from app.errors import InvalidPath
 from app.services.paths import (
+    parent_of,
     resolve_safe,
     safe_join,
     sanitize_upload_filename,
@@ -84,6 +85,24 @@ def test_ルート外を指すシンボリックリンクは拒否される(root
 def test_to_relative(root: Path):
     assert to_relative(root, root) == ""
     assert to_relative(root, root / "X68000" / "a.fdx") == "X68000/a.fdx"
+
+
+# --- parent_of ------------------------------------------------------------
+
+
+def test_parent_of():
+    assert parent_of("X68000/game/disk1.fdx") == "X68000/game"
+    assert parent_of("X68000/disk1.fdx") == "X68000"
+
+
+def test_ルート直下の親は空文字になる():
+    """Path(...).parent は "." を返すが、一覧はルートを空文字で表す。
+
+    表現が 2 つあると、WebSocket の通知を受けたフロントエンドが
+    どのノードを更新すべきか判断できなくなる。
+    """
+    assert parent_of("disk1.fdx") == ""
+    assert parent_of("") == ""
 
 
 # --- validate_name --------------------------------------------------------

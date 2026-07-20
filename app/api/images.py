@@ -5,7 +5,8 @@
 
 import logging
 import urllib.parse
-from pathlib import Path as FilePath
+from collections.abc import Awaitable, Callable, Iterable
+from typing import TypeVar
 
 from fastapi import APIRouter, File, Form, Query, UploadFile
 from fastapi.responses import FileResponse
@@ -21,13 +22,45 @@ from app.models.image import (
     DiskType,
     ImageListing,
     OperationResult,
+    PathResponse,
 )
+from app.services.paths import parent_of
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/images", tags=["images"])
 
 PathQuery = Query(default="", description="イメージルートからの相対パス")
+
+_Item = TypeVar("_Item")
+
+
+async def _run_bulk(
+    items: Iterable[_Item],
+    operation: Callable[[_Item], Awaitable[str]],
+    *,
+    action: str,
+    name_of: Callable[[_Item], str],
+) -> BulkResult:
+    """一括操作を 1 件ずつ実行し、失敗しても中断せずに結果をまとめる。
+
+    10 件選んで 1 件が挿入中だったときに残り 9 件が処理されないのは不便なため、
+    途中で止めずに最後まで進める。この方針を 1 箇所に集約しておくことで、
+    新しい一括操作を追加したときに扱いがばらつかないようにする。
+
+    `operation` は成功時に「結果の相対パス」を返し、
+    失敗時は `FDX68Error` を送出する。
+    """
+    results: list[OperationResult] = []
+
+    for item in items:
+        try:
+            results.append(OperationResult(path=await operation(item), success=True))
+        except FDX68Error as exc:
+            logger.warning("%sに失敗しました: %s (%s)", action, name_of(item), exc.detail)
+            results.append(OperationResult(path=name_of(item), success=False, message=exc.message))
+
+    return BulkResult(results=results)
 
 
 # --- リクエストモデル -------------------------------------------------------
@@ -130,20 +163,20 @@ async def download(images: ImageServiceDep, path: str = PathQuery) -> FileRespon
 # --- 作成 -------------------------------------------------------------------
 
 
-@router.post("/mkdir")
+@router.post("/mkdir", response_model=PathResponse)
 async def mkdir(
     request: MkdirRequest, images: ImageServiceDep, monitor: StatusMonitorDep
-) -> dict[str, str]:
+) -> PathResponse:
     """新規フォルダを作成する。"""
     created = await images.make_directory(request.parent, request.name)
     await monitor.notify_images_changed(request.parent)
-    return {"path": created}
+    return PathResponse(path=created)
 
 
-@router.post("/create")
+@router.post("/create", response_model=PathResponse)
 async def create_image(
     request: CreateImageRequest, images: ImageServiceDep, monitor: StatusMonitorDep
-) -> dict[str, str]:
+) -> PathResponse:
     """ブランクの FDX イメージを作成する。
 
     生成されるのは未フォーマットのディスク。
@@ -158,13 +191,13 @@ async def create_image(
         data_format=request.data_format,
     )
     await monitor.notify_images_changed(request.parent)
-    return {"path": created}
+    return PathResponse(path=created)
 
 
-@router.post("/convert")
+@router.post("/convert", response_model=PathResponse)
 async def convert(
     request: ConvertRequest, images: ImageServiceDep, monitor: StatusMonitorDep
-) -> dict[str, str]:
+) -> PathResponse:
     """非 FDX のイメージを FDX に変換する。
 
     元ファイルは変更せず、変換先が既にあれば上書きせず拒否する。
@@ -175,8 +208,8 @@ async def convert(
         data_format=request.data_format,
         analyze=request.analyze,
     )
-    await monitor.notify_images_changed(str(FilePath(request.path).parent))
-    return {"path": created}
+    await monitor.notify_images_changed(parent_of(request.path))
+    return PathResponse(path=created)
 
 
 # --- アップロード -----------------------------------------------------------
@@ -198,23 +231,24 @@ async def upload(
     # 報告するのではなくリクエスト自体を拒否する。
     images.resolve(path)
 
-    results: list[OperationResult] = []
-
-    for upload_file in files:
-        filename = upload_file.filename or ""
+    async def _save(upload_file: UploadFile) -> str:
         try:
-            saved = await images.save_upload(path, filename, upload_file)
-            results.append(OperationResult(path=saved, success=True))
-        except FDX68Error as exc:
-            logger.warning("アップロードに失敗しました: %s (%s)", filename, exc.detail)
-            results.append(OperationResult(path=filename, success=False, message=exc.message))
+            return await images.save_upload(path, upload_file.filename or "", upload_file)
         finally:
+            # 成否にかかわらず必ず閉じる（一時ファイルを残さないため）
             await upload_file.close()
 
-    if any(r.success for r in results):
+    result = await _run_bulk(
+        files,
+        _save,
+        action="アップロード",
+        name_of=lambda f: f.filename or "",
+    )
+
+    if any(r.success for r in result.results):
         await monitor.notify_images_changed(path)
 
-    return BulkResult(results=results)
+    return result
 
 
 # --- 移動・複製・リネーム ---------------------------------------------------
@@ -229,49 +263,50 @@ async def move(
     1 件ずつ順に処理し、途中で失敗しても中断しない。
     10 件選んで 1 件が挿入中だったときに 9 件が処理されないのは不便なため。
     """
-    results: list[OperationResult] = []
 
-    for source in request.paths:
-        try:
-            moved = await images.move(source, request.dest_dir, copy=request.as_copy)
-            results.append(OperationResult(path=moved, success=True))
-        except FDX68Error as exc:
-            logger.warning("移動に失敗しました: %s (%s)", source, exc.detail)
-            results.append(OperationResult(path=source, success=False, message=exc.message))
+    async def _move(source: str) -> str:
+        return await images.move(source, request.dest_dir, copy=request.as_copy)
 
-    if any(r.success for r in results):
+    result = await _run_bulk(
+        request.paths,
+        _move,
+        action="コピー" if request.as_copy else "移動",
+        name_of=lambda source: source,
+    )
+
+    if any(r.success for r in result.results):
         await monitor.notify_images_changed(request.dest_dir)
 
-    return BulkResult(results=results)
+    return result
 
 
-@router.post("/duplicate")
+@router.post("/duplicate", response_model=PathResponse)
 async def duplicate(
     request: DuplicateRequest, images: ImageServiceDep, monitor: StatusMonitorDep
-) -> dict[str, str]:
+) -> PathResponse:
     """同一ディレクトリに複製を作る。"""
     created = await images.duplicate(request.path)
-    await monitor.notify_images_changed(str(FilePath(request.path).parent))
-    return {"path": created}
+    await monitor.notify_images_changed(parent_of(request.path))
+    return PathResponse(path=created)
 
 
-@router.post("/rename")
+@router.post("/rename", response_model=PathResponse)
 async def rename(
     request: RenameRequest, images: ImageServiceDep, monitor: StatusMonitorDep
-) -> dict[str, str]:
+) -> PathResponse:
     """名前を変更する。
 
     拡張子を変えても形式は変換されない旨は UI が注記する。
     """
     renamed = await images.rename(request.path, request.new_name)
-    await monitor.notify_images_changed(str(FilePath(request.path).parent))
-    return {"path": renamed}
+    await monitor.notify_images_changed(parent_of(request.path))
+    return PathResponse(path=renamed)
 
 
-@router.patch("/attributes")
+@router.patch("/attributes", response_model=PathResponse)
 async def set_attributes(
     request: AttributesRequest, images: ImageServiceDep, monitor: StatusMonitorDep
-) -> dict[str, str]:
+) -> PathResponse:
     """FDX ファイル自体のディスク名・ライトプロテクト属性を変更する。
 
     ドライブの実行時プロテクト（/api/drives/{id}/protect）とは別物。
@@ -281,8 +316,8 @@ async def set_attributes(
         disk_name=request.disk_name,
         write_protected=request.write_protected,
     )
-    await monitor.notify_images_changed(str(FilePath(request.path).parent))
-    return {"path": request.path}
+    await monitor.notify_images_changed(parent_of(request.path))
+    return PathResponse(path=request.path)
 
 
 # --- 削除 -------------------------------------------------------------------
@@ -296,19 +331,19 @@ async def delete(
 
     1 件ずつ順に処理し、挿入中のイメージが混ざっていてもその項目だけスキップする。
     """
-    results: list[OperationResult] = []
-    parents: set[str] = set()
 
-    for target in request.paths:
-        try:
-            await images.delete(target)
-            results.append(OperationResult(path=target, success=True))
-            parents.add(str(FilePath(target).parent))
-        except FDX68Error as exc:
-            logger.warning("削除に失敗しました: %s (%s)", target, exc.detail)
-            results.append(OperationResult(path=target, success=False, message=exc.message))
+    async def _delete(target: str) -> str:
+        await images.delete(target)
+        return target
 
-    for parent in parents:
+    result = await _run_bulk(
+        request.paths,
+        _delete,
+        action="削除",
+        name_of=lambda target: target,
+    )
+
+    for parent in {parent_of(r.path) for r in result.results if r.success}:
         await monitor.notify_images_changed(parent)
 
-    return BulkResult(results=results)
+    return result

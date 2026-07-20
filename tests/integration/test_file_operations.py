@@ -289,6 +289,52 @@ async def test_一括削除は失敗しても中断しない(client: AsyncClient
     assert not (image_root / "bulk0.fdx").exists()
 
 
+# --- 変更通知 ---------------------------------------------------------------
+
+
+class _RecordingSocket:
+    """ブロードキャストされたメッセージを記録する WebSocket の代役。
+
+    ConnectionManager が要求するのは send_json だけ（JsonSocket Protocol）。
+    """
+
+    def __init__(self) -> None:
+        self.messages: list[dict] = []
+
+    async def send_json(self, message: dict) -> None:
+        self.messages.append(message)
+
+
+def _notified_paths(socket: _RecordingSocket) -> list[str]:
+    return [m["path"] for m in socket.messages if m["type"] == "images_changed"]
+
+
+async def test_ルート直下の変更通知は空文字で送られる(client: AsyncClient):
+    """一覧がルートを空文字で表すので、通知の path も空文字で揃える。
+
+    Path(...).parent が返す "." をそのまま送ると、受け取った側は
+    どのノードを更新すべきか判断できなくなる。
+    """
+    socket = _RecordingSocket()
+    await client.app.state.connection_manager.connect(socket)  # type: ignore[attr-defined]
+
+    await client.post("/api/images/rename", json={"path": "disk1.fdx", "new_name": "renamed.fdx"})
+
+    assert _notified_paths(socket) == [""]
+
+
+async def test_サブフォルダの変更通知は親の相対パスになる(client: AsyncClient):
+    socket = _RecordingSocket()
+    await client.app.state.connection_manager.connect(socket)  # type: ignore[attr-defined]
+
+    await client.post(
+        "/api/images/rename",
+        json={"path": "ゲーム/disk1.fdx", "new_name": "renamed.fdx"},
+    )
+
+    assert _notified_paths(socket) == ["ゲーム"]
+
+
 # --- ディスク情報 -----------------------------------------------------------
 
 

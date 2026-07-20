@@ -118,6 +118,12 @@ class DiskInfo(BaseModel):
     )
 
 
+class PathResponse(BaseModel):
+    """単一のファイル・フォルダを作成／変更した操作の結果。"""
+
+    path: str = Field(description="操作結果のイメージルートからの相対パス")
+
+
 class OperationResult(BaseModel):
     """一括操作の結果。
 

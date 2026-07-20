@@ -55,6 +55,18 @@ def to_relative(root: Path, target: Path) -> str:
     return str(target_resolved.relative_to(root_resolved))
 
 
+def parent_of(relative: str) -> str:
+    """相対パスの親ディレクトリを、相対パスとして返す。
+
+    ルート直下の項目では**空文字**を返す。
+    `Path(relative).parent` を使うとルートが `"."` になり、
+    一覧（`ImageListing.path`）がルートを空文字で表すのと食い違ってしまう。
+    ルートの表現を 1 つに保つため、必ずこの関数を使うこと。
+    """
+    index = relative.rfind("/")
+    return relative[:index] if index >= 0 else ""
+
+
 def is_within(root: Path, target: Path) -> bool:
     """target が root の配下（または root 自身）にあるかを返す。"""
     root_resolved = root.resolve()
