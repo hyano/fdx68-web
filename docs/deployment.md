@@ -118,7 +118,11 @@ Web アプリは非 root で動作し、root 権限が必要な操作だけ `sud
 <ユーザー> ALL=(root) NOPASSWD: /usr/bin/pkill -x fddemu
 <ユーザー> ALL=(root) NOPASSWD: /sbin/reboot
 <ユーザー> ALL=(root) NOPASSWD: /sbin/poweroff
+<ユーザー> ALL=(root) NOPASSWD: /usr/bin/systemctl --no-block restart fdx68-web.service
 ```
+
+`systemctl` の行は Web UI からの「Web UI 再起動」で使います。
+unit 名と引数まで固定しているのは、任意の unit を操作させないためです。
 
 `fddctl` は含めていません。**root 権限を必要としないことを実機で確認済み**のため、
 不要な昇格をしない方針にしています。

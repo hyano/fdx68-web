@@ -90,6 +90,26 @@ async def test_reboot_と_poweroff_は_sudo_を経由する(
     assert runner.spawned[-1][:2] == ["sudo", "-n"]
 
 
+async def test_サービス再起動の引数(backend: RealFDX68Backend, runner: FakeCommandRunner):
+    """sudoers の登録内容と完全に一致していないと実機で弾かれるため、全引数を固定する。
+
+    packaging/fdx68-web.sudoers.in の systemctl の行と対応している。
+    --no-block を落とすと、自分自身の停止を待って応答を返せなくなる。
+    """
+    await backend.restart_service()
+
+    assert runner.calls[-1] == [
+        "sudo",
+        "-n",
+        "/usr/bin/systemctl",
+        "--no-block",
+        "restart",
+        "fdx68-web.service",
+    ]
+    # 停止シグナルで殺されうるため spawn は使わない
+    assert runner.spawned == []
+
+
 async def test_use_sudo_が_false_なら昇格しない(runner: FakeCommandRunner):
     """アプリ自体を root で動かす場合に使う。"""
     settings = Settings(backend="real", bin_dir=Path("/usr/local/bin"), use_sudo=False)
@@ -97,6 +117,9 @@ async def test_use_sudo_が_false_なら昇格しない(runner: FakeCommandRunne
 
     await backend.start_fddemu()
     assert runner.spawned[0][0] == "/usr/local/bin/fddemu"
+
+    await backend.restart_service()
+    assert runner.calls[-1][0] == "/usr/bin/systemctl"
 
 
 async def test_fdxconv_の引数(backend: RealFDX68Backend, runner: FakeCommandRunner):

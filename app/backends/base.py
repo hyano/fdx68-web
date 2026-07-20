@@ -119,3 +119,7 @@ class FDX68Backend(ABC):
     @abstractmethod
     async def poweroff(self) -> None:
         """Raspberry Pi をシャットダウンする。"""
+
+    @abstractmethod
+    async def restart_service(self) -> None:
+        """Web UI 自身のサービスを再起動する。主に開発中の再読み込み用。"""

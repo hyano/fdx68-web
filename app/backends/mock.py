@@ -47,6 +47,7 @@ class MockFDX68Backend(FDX68Backend):
     #: システム操作を実際には行わず記録だけする
     reboot_requested: bool = False
     poweroff_requested: bool = False
+    service_restart_requested: bool = False
 
     # --- 状態取得 -----------------------------------------------------------
 
@@ -218,3 +219,8 @@ class MockFDX68Backend(FDX68Backend):
         self.calls.append("poweroff")
         self.poweroff_requested = True
         logger.info("mock: シャットダウンが要求されました（実際には何もしません）")
+
+    async def restart_service(self) -> None:
+        self.calls.append("restart_service")
+        self.service_restart_requested = True
+        logger.info("mock: サービスの再起動が要求されました（実際には何もしません）")

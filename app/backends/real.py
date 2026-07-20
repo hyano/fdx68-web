@@ -23,6 +23,8 @@ _STARTUP_WAIT = 1.0
 _STOP_WAIT = 0.5
 #: 変換は大きなイメージだと時間がかかるため長めに取る
 _CONVERT_TIMEOUT = 300.0
+#: Web UI 自身の systemd unit 名。scripts/install.sh の SERVICE_NAME と一致させること。
+_SERVICE_UNIT = "fdx68-web.service"
 
 
 class RealFDX68Backend(FDX68Backend):
@@ -38,7 +40,7 @@ class RealFDX68Backend(FDX68Backend):
         """root 権限が必要なコマンドを組み立てる。
 
         対象は fddemu（/dev/mem を使うため root 必須）と、
-        pkill / reboot / poweroff のシステム操作。
+        pkill / reboot / poweroff / systemctl のシステム操作。
 
         アプリ自体を root で動かしている場合は sudo が不要になるため、
         FDX68_USE_SUDO で無効にできるようにしている。
@@ -259,6 +261,21 @@ class RealFDX68Backend(FDX68Backend):
 
     async def poweroff(self) -> None:
         await self._runner.spawn(self._privileged("/sbin/poweroff"))
+
+    async def restart_service(self) -> None:
+        # --no-block を付けるのは、systemctl restart の完了を待つと
+        # 自分自身が停止させられて HTTP 応答を返せなくなるため。
+        # --no-block なら systemd にジョブを登録した時点で戻る。
+        #
+        # 他のシステム操作と違って spawn() を使わないのは、spawn した子プロセスも
+        # この unit の cgroup に属し、停止シグナルでジョブ登録前に殺されうるため。
+        # run() で登録の完了を待ってから応答を返す。
+        #
+        # 引数は packaging/fdx68-web.sudoers.in の登録内容と完全に一致させること。
+        await self._run_checked(
+            self._privileged("/usr/bin/systemctl", "--no-block", "restart", _SERVICE_UNIT),
+            timeout=10.0,
+        )
 
 
 def _friendly_message(raw: str) -> str:

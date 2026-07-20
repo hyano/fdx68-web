@@ -21,6 +21,20 @@ ExecStart=@APP_DIR@/.venv/bin/uvicorn app.main:app --host @HOST@ --port @PORT@
 Restart=on-failure
 RestartSec=5
 
+# 停止時にシグナルを送る範囲を、この unit の主プロセス（uvicorn）だけに限定する。
+#
+# 既定の KillMode=control-group では cgroup 内の全プロセスにシグナルが飛ぶため、
+# アプリが起動した fddemu も一緒に落ちる。start_new_session=True で起動していても
+# セッションが分かれるだけで cgroup からは抜けないため、これを避けられない。
+#
+# fddemu は X68000 から見えているフロッピードライブそのものであり、
+# Web UI の再起動やデプロイのたびにドライブが消えるのは受け入れられない。
+# アプリは fddemu を PID ではなく pgrep -x で発見するので、
+# サービスをまたいで生き残っていてもそのまま制御できる。
+#
+# なお systemctl stop でも fddemu は残る。止めたいときは Web UI か fddctl --stop を使う。
+KillMode=process
+
 # ロケールを明示的に固定する。
 #
 # Debian の /etc/default/locale は PAM 経由のログインセッションに適用されるもので、

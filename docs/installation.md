@@ -220,6 +220,7 @@ sudo visudo -f /etc/sudoers.d/fdx68-web
 <ユーザー名> ALL=(root) NOPASSWD: /usr/bin/pkill -x fddemu
 <ユーザー名> ALL=(root) NOPASSWD: /sbin/reboot
 <ユーザー名> ALL=(root) NOPASSWD: /sbin/poweroff
+<ユーザー名> ALL=(root) NOPASSWD: /usr/bin/systemctl --no-block restart fdx68-web.service
 ```
 
 `visudo` を使うのは、構文エラーのある sudoers ファイルを置くと

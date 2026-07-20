@@ -22,3 +22,14 @@ async def poweroff(service: SystemServiceDep) -> dict[str, str]:
     """Raspberry Pi をシャットダウンする。"""
     await service.poweroff()
     return {"message": "シャットダウンを開始しました。"}
+
+
+@router.post("/restart-service")
+async def restart_service(service: SystemServiceDep) -> dict[str, str]:
+    """Web UI 自身のサービスを再起動する。主に開発中の再読み込み用。
+
+    fddemu は unit の KillMode=process により再起動をまたいで生き残るので、
+    X68000 から見えているドライブは維持される。
+    """
+    await service.restart_service()
+    return {"message": "Web UI サービスを再起動しています。"}

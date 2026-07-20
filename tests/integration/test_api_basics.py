@@ -8,6 +8,17 @@ async def test_health(client: AsyncClient):
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
     assert response.json()["backend"] == "mock"
+    # フロントエンドはこの値の変化でサービスの再起動完了を判定する
+    assert isinstance(response.json()["started_at"], float)
+
+
+async def test_web_ui_サービスの再起動(client: AsyncClient):
+    """mock では実際には再起動せず、要求されたことだけを記録する。"""
+    response = await client.post("/api/system/restart-service")
+
+    assert response.status_code == 200
+    assert response.json()["message"]
+    assert client.app.state.backend.service_restart_requested is True  # type: ignore[attr-defined]
 
 
 async def test_fddemu_停止中でもエラーにならない(client: AsyncClient):

@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 class SystemService:
-    """再起動とシャットダウン。"""
+    """再起動とシャットダウン、および Web UI 自身のサービス再起動。"""
 
     def __init__(self, backend: FDX68Backend) -> None:
         self._backend = backend
@@ -24,3 +24,7 @@ class SystemService:
     async def poweroff(self) -> None:
         logger.warning("シャットダウンが要求されました")
         await self._backend.poweroff()
+
+    async def restart_service(self) -> None:
+        logger.warning("Web UI サービスの再起動が要求されました")
+        await self._backend.restart_service()

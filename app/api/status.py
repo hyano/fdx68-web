@@ -1,5 +1,7 @@
 """状態取得と fddemu の制御。"""
 
+import time
+
 from fastapi import APIRouter
 from pydantic import BaseModel
 
@@ -8,10 +10,19 @@ from app.models.drive import FDX68Status
 
 router = APIRouter(prefix="/api", tags=["status"])
 
+# プロセスの起動時刻。モジュールの読み込み時に一度だけ決まる。
+#
+# Web UI から自分自身のサービスを再起動したあと、フロントエンドが
+# 「別のプロセスが立ち上がった」ことを判定するために使う。
+# 「health が落ちるのを待つ」方式では、再起動が速いと落下を観測できずに
+# 取りこぼすため、値の変化で見る。
+_STARTED_AT = time.time()
+
 
 class HealthResponse(BaseModel):
     status: str
     backend: str
+    started_at: float
 
 
 class StartRequest(BaseModel):
@@ -23,7 +34,7 @@ async def health(service: FDX68ServiceDep) -> HealthResponse:
     """疎通確認。デプロイスクリプトとインストーラが使う。"""
     from app.config import get_settings
 
-    return HealthResponse(status="ok", backend=get_settings().backend)
+    return HealthResponse(status="ok", backend=get_settings().backend, started_at=_STARTED_AT)
 
 
 @router.get("/status", response_model=FDX68Status)

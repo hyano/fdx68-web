@@ -165,6 +165,7 @@ fdx68-web.service（非 root の一般ユーザー）
     │  sudo -n /usr/bin/pkill -x fddemu
     │  sudo -n /sbin/reboot
     │  sudo -n /sbin/poweroff
+    │  sudo -n /usr/bin/systemctl --no-block restart fdx68-web.service
     │
     └─ fddctl / fdxconv / fdxtool         ← 昇格せずそのまま実行
 ```
@@ -177,6 +178,37 @@ fddemu が root で動作していても、非 root のまま IPC ソケット�
 不要な昇格が常態化するうえプロセス起動のコストも増えるため、そのまま実行します。
 
 `fdxconv` / `fdxtool` も同様に、ファイル操作のみで GPIO を触らないため昇格しません。
+
+---
+
+## fddemu はサービスの再起動をまたいで生き残る
+
+unit に `KillMode=process` を指定しています。
+
+systemd の既定（`KillMode=control-group`）では、unit を停止するときに
+cgroup 内の全プロセスにシグナルが飛びます。アプリは `fddemu` を
+`start_new_session=True` で起動していますが、これはセッションを分けるだけで
+cgroup からは抜けないため、既定のままだと `fddemu` も一緒に落ちます。
+
+`fddemu` は X68000 から見えているフロッピードライブそのものです。
+Web UI の再起動やデプロイのたびにドライブが消えるのは受け入れられないため、
+シグナルの対象を主プロセス（uvicorn）だけに限定しています。
+
+アプリは `fddemu` を PID ではなく `pgrep -x fddemu` で発見する設計なので、
+再起動後の新しいプロセスからもそのまま制御できます。
+
+副作用として、`systemctl stop` でも `fddemu` は残ります。
+止めたいときは Web UI か `fddctl --stop` を使ってください。
+
+これにより、Web UI からの「Web UI 再起動」（`POST /api/system/restart-service`）が
+X68000 に影響を与えずに済みます。この API は
+`sudo -n systemctl --no-block restart fdx68-web.service` を実行します。
+`--no-block` を付けるのは、完了を待つと自分自身が停止させられて
+HTTP 応答を返せなくなるためです。
+
+再起動の完了はフロントエンドが `/api/health` の `started_at`
+（プロセスの起動時刻）の変化で判定し、変わったらページを再読み込みします。
+「応答が落ちるのを待つ」方式では、再起動が速いと落下を観測できず取りこぼします。
 
 ---
 

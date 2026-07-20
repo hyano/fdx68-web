@@ -240,6 +240,56 @@ document.getElementById("btn-poweroff").addEventListener("click", async () => {
   }
 });
 
+/**
+ * サービスが再起動して別のプロセスとして立ち上がるのを待つ。
+ *
+ * health の落下を待つ方式にしていないのは、再起動が速いと落下を観測できず
+ * 取りこぼすため。プロセス起動時刻 started_at の変化で判定する。
+ */
+async function waitForRestart(previousStartedAt) {
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  // 停止前の古いプロセスが応答してしまうため、少し待ってから見に行く
+  await sleep(1000);
+
+  const deadline = Date.now() + 30000;
+  while (Date.now() < deadline) {
+    try {
+      const health = await api.health();
+      if (health.started_at !== previousStartedAt) return true;
+    } catch {
+      // 再起動中は接続できなくて当然なので、黙って次の試行へ進む
+    }
+    await sleep(500);
+  }
+  return false;
+}
+
+document.getElementById("btn-restart-service").addEventListener("click", async () => {
+  const ok = await confirmAction({
+    title: "Web UI サービスを再起動しますか？",
+    message: "数秒間 Web UI が応答しなくなります。復帰すると自動的に再読み込みされます。",
+    note: "fddemu は動作を続けるため、X68000 のドライブは維持されます。",
+    okLabel: "再起動",
+  });
+  if (!ok) return;
+
+  try {
+    // 再起動を投げる前に、いまのプロセスの起動時刻を控えておく
+    const { started_at: previousStartedAt } = await api.health();
+    await api.restartService();
+    toast("Web UI を再起動しています…", "warning", 0);
+
+    if (await waitForRestart(previousStartedAt)) {
+      location.reload();
+    } else {
+      toast("再起動を確認できませんでした。手動で再読み込みしてください。", "error", 0);
+    }
+  } catch (error) {
+    await handleError(error);
+  }
+});
+
 // --- ツリーの操作 -----------------------------------------------------------
 
 /** 選択中のフォルダ（なければルート）を返す。アップロード先の決定に使う。 */

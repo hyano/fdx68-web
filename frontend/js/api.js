@@ -86,6 +86,7 @@ export const api = {
 
   reboot: () => request("/api/system/reboot", { method: "POST" }),
   poweroff: () => request("/api/system/poweroff", { method: "POST" }),
+  restartService: () => request("/api/system/restart-service", { method: "POST" }),
 
   /*
    * アップロードは fetch では進捗が取れないため XMLHttpRequest を使う。

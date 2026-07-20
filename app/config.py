@@ -29,7 +29,7 @@ class Settings(BaseSettings):
 
     bin_dir: Path = Path("/usr/local/bin")
 
-    # root 権限が必要なコマンド（fddemu / pkill / reboot / poweroff）を
+    # root 権限が必要なコマンド（fddemu / pkill / reboot / poweroff / systemctl）を
     # sudo -n 経由で実行するか。アプリ自体を root で動かす場合は false にする。
     #
     # fddctl はこの設定の対象外である。root 権限を必要としないことを実機で
