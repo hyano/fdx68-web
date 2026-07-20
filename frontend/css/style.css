@@ -302,9 +302,9 @@ code { font-family: var(--font-mono); font-size: 0.9em; }
  * 変換が必要なイメージのバッジ。
  * JS はバッジの DOM を作らない。data-kind から CSS が生成する。
  */
-.node[data-kind="convertible_image"] > .node__row .node__name::after {
+.node[data-kind="convertible_image"] > .node__row .node__name::before {
   content: "要変換";
-  margin-left: var(--space-sm);
+  margin-right: var(--space-sm);
   padding: 0 var(--space-xs);
   font-size: 10px;
   border: 1px solid var(--color-warning);
