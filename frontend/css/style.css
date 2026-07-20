@@ -302,23 +302,23 @@ code { font-family: var(--font-mono); font-size: 0.9em; }
   flex: none;
 }
 
-/* 種別ごとに出す操作を変える */
-.node[data-kind="directory"] .node__insert0,
-.node[data-kind="directory"] .node__insert1,
-.node[data-kind="directory"] .node__convert,
-.node[data-kind="unsupported"] .node__insert0,
-.node[data-kind="unsupported"] .node__insert1,
-.node[data-kind="unsupported"] .node__convert,
-.node[data-kind="convertible_image"] .node__insert0,
-.node[data-kind="convertible_image"] .node__insert1,
-.node[data-kind="fdx"] .node__convert { display: none; }
+/* 種別ごとに出す操作を変える。
+ * ツリーは入れ子なので、> .node__row でそのノード自身の行に限定する。
+ * 子孫結合子にすると、フォルダ配下のファイルまで巻き込んで消えてしまう。 */
+.node[data-kind="directory"] > .node__row .node__insert0,
+.node[data-kind="directory"] > .node__row .node__insert1,
+.node[data-kind="directory"] > .node__row .node__convert,
+.node[data-kind="unsupported"] > .node__row .node__insert0,
+.node[data-kind="unsupported"] > .node__row .node__insert1,
+.node[data-kind="unsupported"] > .node__row .node__convert,
+.node[data-kind="convertible_image"] > .node__row .node__insert0,
+.node[data-kind="convertible_image"] > .node__row .node__insert1,
+.node[data-kind="fdx"] > .node__row .node__convert { display: none; }
 
-.node[data-kind="directory"] .node__info,
-.node[data-kind="directory"] .node__attrs,
-.node[data-kind="directory"] .node__duplicate,
-.node[data-kind="directory"] .node__download,
-.node:not([data-kind="fdx"]) .node__info,
-.node:not([data-kind="fdx"]) .node__attrs { display: none; }
+.node[data-kind="directory"] > .node__row .node__duplicate,
+.node[data-kind="directory"] > .node__row .node__download,
+.node:not([data-kind="fdx"]) > .node__row .node__info,
+.node:not([data-kind="fdx"]) > .node__row .node__attrs { display: none; }
 
 /* --- メニュー ------------------------------------------------------------- */
 
