@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.deps import ImageServiceDep, StatusMonitorDep
-from app.errors import FDX68Error, NotFound
+from app.errors import FDX68Error
 from app.models.image import (
     AnalyzeMode,
     BulkResult,
@@ -113,13 +113,7 @@ async def download(images: ImageServiceDep, path: str = PathQuery) -> FileRespon
 
     実機で書き込まれたセーブディスクの退避や、変換結果の回収に使う。
     """
-    target = images.resolve(path)
-
-    if not target.exists():
-        raise NotFound()
-    if target.is_dir():
-        # ZIP 化は Pi の CPU に対して重すぎるため対応しない
-        raise NotFound("フォルダはダウンロードできません。")
+    target = images.resolve_for_download(path)
 
     # 日本語ファイル名は RFC 5987 の filename* で指定する。
     # filename= だけでは文字化けする。
@@ -209,7 +203,7 @@ async def upload(
     for upload_file in files:
         filename = upload_file.filename or ""
         try:
-            saved = await images.save_upload(path, filename, reader=upload_file)
+            saved = await images.save_upload(path, filename, upload_file)
             results.append(OperationResult(path=saved, success=True))
         except FDX68Error as exc:
             logger.warning("アップロードに失敗しました: %s (%s)", filename, exc.detail)

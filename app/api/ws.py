@@ -20,8 +20,8 @@ async def status_websocket(websocket: WebSocket) -> None:
     - ``{"type": "status", ...}``          ドライブ状態（変化があったときのみ）
     - ``{"type": "images_changed", ...}``  ファイル操作の通知
     """
-    manager = get_connection_manager(websocket)  # type: ignore[arg-type]
-    monitor = get_status_monitor(websocket)  # type: ignore[arg-type]
+    manager = get_connection_manager(websocket)
+    monitor = get_status_monitor(websocket)
 
     await websocket.accept()
     await manager.connect(websocket)

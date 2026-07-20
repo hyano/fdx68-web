@@ -2,11 +2,15 @@
 
 アプリケーション全体で 1 組のバックエンド・サービスを共有する。
 FastAPI のハンドラはここから受け取る。
+
+HTTPConnection で受けるのは、Request（HTTP）と WebSocket の共通基底だからである。
+どちらも .app.state を読むだけなので、WebSocket ハンドラからも同じ関数を使える。
 """
 
 from typing import Annotated
 
-from fastapi import Depends, Request
+from fastapi import Depends
+from starlette.requests import HTTPConnection
 
 from app.backends.base import FDX68Backend
 from app.config import Settings
@@ -16,32 +20,32 @@ from app.services.image_service import ImageService
 from app.services.system_service import SystemService
 
 
-def get_settings(request: Request) -> Settings:
-    return request.app.state.settings
+def get_settings(connection: HTTPConnection) -> Settings:
+    return connection.app.state.settings
 
 
-def get_backend(request: Request) -> FDX68Backend:
-    return request.app.state.backend
+def get_backend(connection: HTTPConnection) -> FDX68Backend:
+    return connection.app.state.backend
 
 
-def get_image_service(request: Request) -> ImageService:
-    return request.app.state.image_service
+def get_image_service(connection: HTTPConnection) -> ImageService:
+    return connection.app.state.image_service
 
 
-def get_fdx68_service(request: Request) -> FDX68Service:
-    return request.app.state.fdx68_service
+def get_fdx68_service(connection: HTTPConnection) -> FDX68Service:
+    return connection.app.state.fdx68_service
 
 
-def get_system_service(request: Request) -> SystemService:
-    return request.app.state.system_service
+def get_system_service(connection: HTTPConnection) -> SystemService:
+    return connection.app.state.system_service
 
 
-def get_status_monitor(request: Request) -> StatusMonitor:
-    return request.app.state.status_monitor
+def get_status_monitor(connection: HTTPConnection) -> StatusMonitor:
+    return connection.app.state.status_monitor
 
 
-def get_connection_manager(request: Request) -> ConnectionManager:
-    return request.app.state.connection_manager
+def get_connection_manager(connection: HTTPConnection) -> ConnectionManager:
+    return connection.app.state.connection_manager
 
 
 SettingsDep = Annotated[Settings, Depends(get_settings)]

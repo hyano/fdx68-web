@@ -385,16 +385,12 @@ elements.tree.addEventListener("keydown", async (event) => {
 // --- 個別の操作 -------------------------------------------------------------
 
 async function insertInto(driveId, path) {
-  const warning = accessWarning();
-  if (warning) {
-    const ok = await confirmAction({
-      title: "ディスクを交換しますか？",
-      message: warning,
-      note: "アクセス中に交換すると、X68000 側で読み書きが失敗することがあります。",
-      okLabel: "交換する",
-    });
-    if (!ok) return;
-  }
+  const ok = await confirmIfAccessing({
+    title: "ディスクを交換しますか？",
+    note: "アクセス中に交換すると、X68000 側で読み書きが失敗することがあります。",
+    okLabel: "交換する",
+  });
+  if (!ok) return;
 
   try {
     renderStatus(await api.insert(driveId, path));
@@ -422,8 +418,7 @@ async function convertPaths(paths) {
   }
 
   reportBulk("変換", succeeded, failures);
-  await refreshPath(parentOf(paths[0]));
-  tree.clearSelection();
+  await refreshParentsAndClear(paths);
 }
 
 async function showInfo(path) {
@@ -456,16 +451,12 @@ async function editAttributes(path) {
 }
 
 async function duplicate(path) {
-  const warning = accessWarning();
-  if (warning) {
-    const ok = await confirmAction({
-      title: "複製しますか？",
-      message: warning,
-      note: "X68000 が書き込み中のイメージを複製すると、不整合なコピーになることがあります。",
-      okLabel: "複製する",
-    });
-    if (!ok) return;
-  }
+  const ok = await confirmIfAccessing({
+    title: "複製しますか？",
+    note: "X68000 が書き込み中のイメージを複製すると、不整合なコピーになることがあります。",
+    okLabel: "複製する",
+  });
+  if (!ok) return;
 
   try {
     const result = await api.duplicate(path);
@@ -517,19 +508,13 @@ async function remove(paths) {
   if (!ok) return;
 
   try {
-    const result = await api.remove(paths);
-    const failures = result.results
-      .filter((entry) => !entry.success)
-      .map((entry) => `${entry.path}: ${entry.message}`);
-    reportBulk("削除", result.results.length - failures.length, failures);
+    reportBulkResult("削除", await api.remove(paths));
   } catch (error) {
     await handleError(error);
     return;
   }
 
-  const parents = new Set(paths.map(parentOf));
-  for (const parent of parents) await refreshPath(parent);
-  tree.clearSelection();
+  await refreshParentsAndClear(paths);
 }
 
 /**
@@ -543,6 +528,36 @@ function reportBulk(label, succeeded, failures) {
   for (const failure of failures) {
     toast(`${label}できませんでした — ${failure}`, "error", 0);
   }
+}
+
+/** サーバーの BulkResult をそのまま報告する。成功数は結果から数える。 */
+function reportBulkResult(label, result) {
+  const failures = result.results
+    .filter((entry) => !entry.success)
+    .map((entry) => `${entry.path}: ${entry.message}`);
+
+  reportBulk(label, result.results.length - failures.length, failures);
+}
+
+/**
+ * 一括操作のあとに表示を実態へ合わせる。
+ * 影響を受けた親フォルダだけを取り直し、選択は解除する。
+ */
+async function refreshParentsAndClear(paths, ...extraPaths) {
+  const parents = new Set(paths.map(parentOf));
+  for (const extra of extraPaths) parents.add(extra);
+  for (const parent of parents) await refreshPath(parent);
+  tree.clearSelection();
+}
+
+/**
+ * X68000 がアクセス中かもしれないときだけ確認を取る。
+ * 続行してよければ true を返す。
+ */
+async function confirmIfAccessing({ title, note, okLabel }) {
+  const warning = accessWarning();
+  if (!warning) return true;
+  return confirmAction({ title, message: warning, note, okLabel });
 }
 
 // --- ツールバー -------------------------------------------------------------
@@ -715,21 +730,13 @@ elements.treeContainer.addEventListener("drop", async (event) => {
 
 async function movePaths(paths, destDir, copy) {
   try {
-    const result = await api.move(paths, destDir, copy);
-    const failures = result.results
-      .filter((entry) => !entry.success)
-      .map((entry) => `${entry.path}: ${entry.message}`);
-
-    reportBulk(copy ? "コピー" : "移動", result.results.length - failures.length, failures);
+    reportBulkResult(copy ? "コピー" : "移動", await api.move(paths, destDir, copy));
   } catch (error) {
     await handleError(error);
     return;
   }
 
-  const parents = new Set(paths.map(parentOf));
-  parents.add(destDir);
-  for (const parent of parents) await refreshPath(parent);
-  tree.clearSelection();
+  await refreshParentsAndClear(paths, destDir);
 }
 
 // --- アップロード -----------------------------------------------------------

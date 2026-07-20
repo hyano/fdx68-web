@@ -9,9 +9,9 @@ import logging
 import os
 import re
 import shutil
-from collections.abc import Iterable
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Protocol
 
 from app.backends.base import FDX68Backend
 from app.config import Settings
@@ -50,6 +50,16 @@ UPLOAD_CHUNK_SIZE = 1024 * 1024
 
 #: 自然順ソート用（数字部分を数値として比較する）
 _NATURAL_SORT_PATTERN = re.compile(r"(\d+)")
+
+
+class ChunkReader(Protocol):
+    """チャンク単位で読み出せるオブジェクト。
+
+    FastAPI の `UploadFile` がこれを満たす。
+    サービス層が FastAPI に依存しないよう、具象型ではなく振る舞いで受ける。
+    """
+
+    async def read(self, size: int) -> bytes: ...
 
 
 def classify(path: Path) -> ImageKind:
@@ -104,6 +114,37 @@ class ImageService:
 
     def to_relative(self, absolute: Path) -> str:
         return path_utils.to_relative(self.root, absolute)
+
+    # --- ガード -------------------------------------------------------------
+    #
+    # 各操作の前置き検査をここに集約する。
+    # ガード条件が分散すると、新しい操作を追加したときに検査を入れ忘れて
+    # 挿入中のイメージを壊す事故につながる。**条件は緩めないこと。**
+
+    def _require_existing(self, relative: str | None) -> Path:
+        """相対パスを解決し、実在することを確認して返す。
+
+        外部（SSH や rsync）で削除されている場合があるため、
+        すべての操作がこの検査を通る。
+        """
+        target = self.resolve(relative)
+        if not target.exists():
+            raise NotFound()
+        return target
+
+    def _reject_root(self, target: Path, action: str) -> None:
+        """ルートフォルダ自身への破壊的操作を拒否する。"""
+        if target == self.root.resolve():
+            raise InvalidPath(f"ルートフォルダは{action}できません。")
+
+    @staticmethod
+    def _require_fdx(target: Path) -> None:
+        """FDX 形式であることを確認する。
+
+        fdxtool は FDX しか扱えないため、情報取得と属性変更の前に必要。
+        """
+        if classify(target) is not ImageKind.FDX:
+            raise UnsupportedFileType("FDX 形式のファイルではありません。")
 
     # --- 挿入中イメージのガード ---------------------------------------------
 
@@ -282,10 +323,8 @@ class ImageService:
 
         元ファイルは変更しない。変換先が既にあれば上書きせず拒否する。
         """
-        source = self.resolve(relative)
+        source = self._require_existing(relative)
 
-        if not source.exists():
-            raise NotFound()
         if source.is_dir():
             raise InvalidPath("フォルダは変換できません。")
 
@@ -318,12 +357,19 @@ class ImageService:
     # --- ディスク情報 -------------------------------------------------------
 
     async def get_info(self, relative: str) -> DiskInfo:
-        target = self.resolve(relative)
-        if not target.exists():
-            raise NotFound()
-        if classify(target) is not ImageKind.FDX:
-            raise UnsupportedFileType("FDX 形式のファイルではありません。")
+        target = self._require_existing(relative)
+        self._require_fdx(target)
         return await self._backend.get_disk_info(target)
+
+    def resolve_for_download(self, relative: str) -> Path:
+        """ダウンロード対象のパスを解決する。
+
+        フォルダの ZIP 化は Pi の CPU に対して重すぎるため対応しない。
+        """
+        target = self._require_existing(relative)
+        if target.is_dir():
+            raise NotFound("フォルダはダウンロードできません。")
+        return target
 
     async def set_attributes(
         self,
@@ -336,11 +382,8 @@ class ImageService:
 
         ファイルを書き換えるため、挿入中のイメージには適用しない。
         """
-        target = self.resolve(relative)
-        if not target.exists():
-            raise NotFound()
-        if classify(target) is not ImageKind.FDX:
-            raise UnsupportedFileType("FDX 形式のファイルではありません。")
+        target = self._require_existing(relative)
+        self._require_fdx(target)
 
         await self.assert_not_mounted(target)
         await self._backend.set_disk_attributes(
@@ -352,12 +395,8 @@ class ImageService:
 
     async def rename(self, relative: str, new_name: str) -> str:
         """ファイルまたはフォルダの名前を変更する。"""
-        target = self.resolve(relative)
-
-        if not target.exists():
-            raise NotFound()
-        if target == self.root.resolve():
-            raise InvalidPath("ルートフォルダの名前は変更できません。")
+        target = self._require_existing(relative)
+        self._reject_root(target, "名前を変更")
 
         await self.assert_not_mounted(target)
 
@@ -376,13 +415,10 @@ class ImageService:
 
     async def move(self, relative: str, dest_dir: str | None, *, copy: bool = False) -> str:
         """ファイルまたはフォルダを別のディレクトリへ移動（またはコピー）する。"""
-        source = self.resolve(relative)
+        source = self._require_existing(relative)
         destination_dir = self.resolve(dest_dir)
 
-        if not source.exists():
-            raise NotFound()
-        if source == self.root.resolve():
-            raise InvalidPath("ルートフォルダは移動できません。")
+        self._reject_root(source, "移動")
         if not destination_dir.exists() or not destination_dir.is_dir():
             raise NotFound("移動先のフォルダが見つかりません。")
 
@@ -430,10 +466,8 @@ class ImageService:
         「マスターを残したまま、コピーを実機に挿して書き込ませる」
         という X68000 で頻繁に必要になる使い方のための機能。
         """
-        source = self.resolve(relative)
+        source = self._require_existing(relative)
 
-        if not source.exists():
-            raise NotFound()
         if source.is_dir():
             raise InvalidPath("フォルダの複製には対応していません。")
 
@@ -478,18 +512,12 @@ class ImageService:
 
     # --- アップロード -------------------------------------------------------
 
-    async def save_upload(
-        self,
-        dest_dir: str | None,
-        filename: str,
-        chunks: Iterable[bytes] | None = None,
-        *,
-        reader: object | None = None,
-    ) -> str:
+    async def save_upload(self, dest_dir: str | None, filename: str, reader: ChunkReader) -> str:
         """アップロードされたファイルを保存する。
 
-        `reader` には `read(size)` を持つ非同期オブジェクト（UploadFile）を渡す。
         メモリに全体を載せないよう、必ずチャンク単位で読み書きする。
+        Raspberry Pi の空きメモリは 275MB しかなく、
+        上限の 256MB を一度に載せる実装では動かない。
         """
         directory = self.resolve(dest_dir)
         if not directory.exists() or not directory.is_dir():
@@ -520,7 +548,11 @@ class ImageService:
 
         try:
             with part.open("wb") as out:
-                async for chunk in _iter_chunks(chunks, reader):
+                while True:
+                    chunk = await reader.read(UPLOAD_CHUNK_SIZE)
+                    if not chunk:
+                        break
+
                     written += len(chunk)
                     if written > limit:
                         raise UploadTooLarge(
@@ -541,12 +573,8 @@ class ImageService:
 
     async def delete(self, relative: str) -> None:
         """ファイルまたは空のディレクトリを削除する。"""
-        target = self.resolve(relative)
-
-        if not target.exists():
-            raise NotFound()
-        if target == self.root.resolve():
-            raise InvalidPath("ルートフォルダは削除できません。")
+        target = self._require_existing(relative)
+        self._reject_root(target, "削除")
 
         await self.assert_not_mounted(target)
 
@@ -579,21 +607,3 @@ class ImageService:
                 logger.info("中途半端なファイルを削除しました: %s", path)
         except OSError:
             logger.warning("一時ファイルを削除できませんでした: %s", path, exc_info=True)
-
-
-async def _iter_chunks(chunks: Iterable[bytes] | None, reader: object | None):  # noqa: ANN202
-    """同期のイテラブルと非同期の reader の両方に対応してチャンクを返す。"""
-    if chunks is not None:
-        for chunk in chunks:
-            yield chunk
-        return
-
-    if reader is None:
-        raise InvalidPath("アップロードするデータがありません。")
-
-    read = reader.read  # type: ignore[attr-defined]
-    while True:
-        chunk = await read(UPLOAD_CHUNK_SIZE)
-        if not chunk:
-            break
-        yield chunk

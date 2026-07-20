@@ -7,12 +7,23 @@ fddemu は GPIO のビットバンギングで FDD 信号を生成しており�
 import asyncio
 import contextlib
 import logging
-from typing import Any
+from typing import Any, Protocol
 
 from app.models.drive import FDX68Status
 from app.services.fdx68_service import FDX68Service
 
 logger = logging.getLogger(__name__)
+
+
+class JsonSocket(Protocol):
+    """JSON を送信できる接続。
+
+    FastAPI の `WebSocket` がこれを満たす。
+    監視層が FastAPI に依存しないよう、具象型ではなく振る舞いで受ける。
+    """
+
+    async def send_json(self, data: dict[str, Any]) -> None: ...
+
 
 #: WebSocket クライアントが 0 件のときのポーリング間隔（秒）。
 #: 誰も見ていないのに 2 秒ごとに fddctl を叩き続ける必要はない。
@@ -26,19 +37,19 @@ class ConnectionManager:
     """WebSocket 接続の管理とブロードキャスト。"""
 
     def __init__(self) -> None:
-        self._connections: set[Any] = set()
+        self._connections: set[JsonSocket] = set()
         self._lock = asyncio.Lock()
 
     @property
     def count(self) -> int:
         return len(self._connections)
 
-    async def connect(self, websocket: Any) -> None:
+    async def connect(self, websocket: JsonSocket) -> None:
         async with self._lock:
             self._connections.add(websocket)
         logger.debug("WebSocket が接続しました（現在 %d 件）", self.count)
 
-    async def disconnect(self, websocket: Any) -> None:
+    async def disconnect(self, websocket: JsonSocket) -> None:
         async with self._lock:
             self._connections.discard(websocket)
         logger.debug("WebSocket が切断しました（現在 %d 件）", self.count)
@@ -52,7 +63,7 @@ class ConnectionManager:
         async with self._lock:
             targets = list(self._connections)
 
-        dead: list[Any] = []
+        dead: list[JsonSocket] = []
         for connection in targets:
             try:
                 await connection.send_json(message)
