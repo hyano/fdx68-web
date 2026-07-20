@@ -111,15 +111,18 @@ function renderDrives(drives) {
     card.dataset.recent = String(isRecentlyAccessed(drive));
 
     card.querySelector(".drive__title").textContent = `Drive ${drive.id}`;
-    card.querySelector(".drive__image").textContent = drive.inserted
-      ? (drive.image_relative || drive.image)
-      : "（未挿入）";
+    const imagePath = drive.image_relative || drive.image;
+    const imageCell = card.querySelector(".drive__image");
+    imageCell.textContent = drive.inserted ? imagePath.split("/").pop() : "（未挿入）";
+    imageCell.title = drive.inserted ? imagePath : "";
     card.querySelector(".drive__cylinder").textContent =
       drive.cylinder !== null && drive.cylinder !== undefined
         ? String(drive.cylinder)
         : (drive.cylinder_raw ?? "—");
 
-    card.querySelector(".drive__eject").addEventListener("click", async () => {
+    const ejectButton = card.querySelector(".drive__eject");
+    ejectButton.disabled = !drive.inserted;
+    ejectButton.addEventListener("click", async () => {
       try {
         renderStatus(await api.eject(drive.id));
         toast(`Drive ${drive.id} を排出しました。`, "success", 3000);
@@ -129,6 +132,7 @@ function renderDrives(drives) {
     });
 
     const protectButton = card.querySelector(".drive__protect");
+    protectButton.disabled = !drive.inserted;
     protectButton.textContent = drive.write_protected
       ? "プロテクト解除"
       : "プロテクト設定";

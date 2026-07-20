@@ -5,8 +5,13 @@
 
 * { box-sizing: border-box; }
 
+html, body { height: 100%; }
+
 body {
   margin: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   font-family: var(--font-ui);
   font-size: var(--font-size);
   color: var(--color-text);
@@ -24,6 +29,7 @@ code { font-family: var(--font-mono); font-size: 0.9em; }
 /* --- ヘッダ --------------------------------------------------------------- */
 
 .app-header {
+  flex: none;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -54,12 +60,15 @@ code { font-family: var(--font-mono); font-size: 0.9em; }
 /* --- レイアウト ----------------------------------------------------------- */
 
 .layout {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: var(--space-lg);
   padding: var(--space-lg);
   max-width: 1400px;
+  width: 100%;
   margin: 0 auto;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .panel {
@@ -70,9 +79,25 @@ code { font-family: var(--font-mono); font-size: 0.9em; }
   box-shadow: var(--shadow-panel);
 }
 
-.panel--wide { grid-column: 1 / -1; }
+#drives-panel { flex: none; }
+
+#browser-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.control-row {
+  flex: none;
+  display: flex;
+  gap: var(--space-lg);
+}
+
+.control-row .panel { flex: 1 1 0; min-width: 0; }
 
 .panel__head {
+  flex: none;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -124,6 +149,10 @@ code { font-family: var(--font-mono); font-size: 0.9em; }
 .button-row { display: flex; gap: var(--space-sm); flex-wrap: wrap; }
 .toolbar { display: flex; gap: var(--space-sm); flex-wrap: wrap; }
 
+/* システムの3ボタンは折り返さず1行に並べる */
+#system-panel .button-row { flex-wrap: nowrap; }
+#system-panel .button-row .button { flex: 1 1 0; }
+
 /* --- fddemu の状態 -------------------------------------------------------- */
 
 .emulator {
@@ -149,7 +178,7 @@ code { font-family: var(--font-mono); font-size: 0.9em; }
 
 /* --- ドライブ ------------------------------------------------------------- */
 
-.drives { display: grid; gap: var(--space-md); }
+.drives { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-md); }
 
 .drive {
   border: 1px solid var(--color-border);
@@ -204,16 +233,13 @@ code { font-family: var(--font-mono); font-size: 0.9em; }
 }
 .drive[data-recent="true"] .drive__warning { display: block; }
 
-.drive[data-state="empty"] .drive__eject,
-.drive[data-state="empty"] .drive__protect { display: none; }
-
 /* --- ツリー --------------------------------------------------------------- */
 
 .tree-container {
+  flex: 1 1 auto;
+  min-height: 0;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
-  min-height: 200px;
-  max-height: 60vh;
   overflow: auto;
   padding: var(--space-sm);
 }
@@ -355,6 +381,7 @@ code { font-family: var(--font-mono); font-size: 0.9em; }
 /* --- 一括操作 ------------------------------------------------------------- */
 
 .bulk-bar {
+  flex: none;
   display: flex;
   align-items: center;
   gap: var(--space-sm);
@@ -367,7 +394,7 @@ code { font-family: var(--font-mono); font-size: 0.9em; }
 
 /* --- アップロード --------------------------------------------------------- */
 
-.uploads { display: grid; gap: var(--space-xs); margin-top: var(--space-md); }
+.uploads { flex: none; display: grid; gap: var(--space-xs); margin-top: var(--space-md); }
 
 .upload {
   display: grid;

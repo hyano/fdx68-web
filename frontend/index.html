@@ -20,22 +20,6 @@
 
 <main class="layout">
 
-  <!-- FDX68 の状態と fddemu の制御 -->
-  <section class="panel" id="emulator-panel">
-    <h2>FDX68</h2>
-    <div class="emulator" id="emulator" data-running="false">
-      <div class="emulator__state">
-        <span class="emulator__indicator"></span>
-        <span class="emulator__label" id="emulator-label">状態を取得しています…</span>
-      </div>
-      <div class="button-row">
-        <button type="button" id="btn-start" class="button button--primary">起動</button>
-        <button type="button" id="btn-stop" class="button">停止</button>
-      </div>
-    </div>
-    <p class="note" id="emulator-note"></p>
-  </section>
-
   <!-- ドライブ -->
   <section class="panel" id="drives-panel">
     <h2>ドライブ</h2>
@@ -43,7 +27,7 @@
   </section>
 
   <!-- イメージブラウザ -->
-  <section class="panel panel--wide" id="browser-panel">
+  <section class="panel" id="browser-panel">
     <div class="panel__head">
       <h2>ディスクイメージ</h2>
       <div class="toolbar">
@@ -69,16 +53,35 @@
     <div class="uploads" id="uploads"></div>
   </section>
 
-  <!-- システム操作 -->
-  <section class="panel" id="system-panel">
-    <h2>システム</h2>
-    <div class="button-row">
-      <button type="button" id="btn-reboot" class="button button--danger">再起動</button>
-      <button type="button" id="btn-poweroff" class="button button--danger">シャットダウン</button>
-      <button type="button" id="btn-restart-service" class="button button--danger">Web UI 再起動</button>
-    </div>
-    <p class="note">X68000 の動作中に実行しないでください。</p>
-  </section>
+  <!-- FDX68 の起動・停止とシステム操作 -->
+  <div class="control-row">
+    <!-- FDX68 の状態と fddemu の制御 -->
+    <section class="panel" id="emulator-panel">
+      <h2>FDX68</h2>
+      <div class="emulator" id="emulator" data-running="false">
+        <div class="emulator__state">
+          <span class="emulator__indicator"></span>
+          <span class="emulator__label" id="emulator-label">状態を取得しています…</span>
+        </div>
+        <div class="button-row">
+          <button type="button" id="btn-start" class="button button--primary">起動</button>
+          <button type="button" id="btn-stop" class="button">停止</button>
+        </div>
+      </div>
+      <p class="note" id="emulator-note"></p>
+    </section>
+
+    <!-- システム操作 -->
+    <section class="panel" id="system-panel">
+      <h2>システム</h2>
+      <div class="button-row">
+        <button type="button" id="btn-reboot" class="button button--danger">再起動</button>
+        <button type="button" id="btn-poweroff" class="button button--danger">シャットダウン</button>
+        <button type="button" id="btn-restart-service" class="button button--danger">Web UI 再起動</button>
+      </div>
+      <p class="note">X68000 の動作中に実行しないでください。</p>
+    </section>
+  </div>
 
 </main>
 
