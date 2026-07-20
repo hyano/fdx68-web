@@ -86,7 +86,7 @@ fddctl --stop    fddemu プロセスを停止
 ```
 
 バックグラウンドで動作している `fddemu` に対して、ソケット経由で
-ディスクの挿入・排出・ライトプロテクトの設定を行います。
+ディスクの挿入・イジェクト・ライトプロテクトの設定を行います。
 
 `fddctl -l` の出力形式:
 
@@ -273,7 +273,7 @@ fdinfo -i ID [OPTION]...
 | パーミッション | `rwxr-xr-x`（setuid なし） |
 | 同梱ファイル | コマンド 10 個 + `fddseek.wav` / `fddinsert.wav` / `fddeject.wav` |
 
-wav ファイルは V2PRO 基板・PRO 化アドオンボードでのシーク音・挿入音・排出音の
+wav ファイルは V2PRO 基板・PRO 化アドオンボードでのシーク音・挿入音・イジェクト音の
 再生に使われます。これらの基板がない環境では使われません。
 
 `fddemu` のバイナリには `/dev/mem` と `GPIOCTL::MapGpioMem` のシンボルがあり、

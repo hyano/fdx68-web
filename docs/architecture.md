@@ -38,7 +38,7 @@ app/
 ├── deps.py                バックエンド・サービスの依存注入
 ├── api/
 │   ├── status.py          GET /api/health, GET /api/status
-│   ├── drives.py          ドライブ操作（挿入・排出・プロテクト）
+│   ├── drives.py          ドライブ操作（挿入・イジェクト・プロテクト）
 │   ├── images.py          イメージ管理（一覧・変換・作成・移動・複製・アップロード等）
 │   ├── system.py          再起動・シャットダウン
 │   └── ws.py              WebSocket エンドポイント

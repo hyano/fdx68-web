@@ -144,14 +144,14 @@ class ImageService:
             if mounted_path == target_resolved:
                 drives = " と ".join(f"Drive {i}" for i in drive_ids)
                 raise ImageMounted(
-                    f"このイメージは現在 {drives} に挿入されています。先に排出してください。"
+                    f"このイメージは現在 {drives} に挿入されています。先にイジェクトしてください。"
                 )
 
             if target_resolved in mounted_path.parents:
                 drives = " と ".join(f"Drive {i}" for i in drive_ids)
                 raise ImageMounted(
                     f"このフォルダには {drives} に挿入中のイメージが含まれています。"
-                    "先に排出してください。"
+                    "先にイジェクトしてください。"
                 )
 
     # --- 一覧 ---------------------------------------------------------------

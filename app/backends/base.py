@@ -53,7 +53,7 @@ class FDX68Backend(ABC):
 
     @abstractmethod
     async def eject(self, drive_id: int) -> None:
-        """ドライブからディスクイメージを排出する。"""
+        """ドライブからディスクイメージをイジェクトする。"""
 
     @abstractmethod
     async def set_write_protect(self, drive_id: int, enabled: bool) -> None:

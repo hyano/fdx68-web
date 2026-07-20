@@ -1,4 +1,4 @@
-"""ドライブ操作（挿入・排出・ライトプロテクト）。"""
+"""ドライブ操作（挿入・イジェクト・ライトプロテクト）。"""
 
 from fastapi import APIRouter, Path
 from pydantic import BaseModel, Field
@@ -40,7 +40,7 @@ async def eject(
     monitor: StatusMonitorDep,
     drive_id: int = DriveId,
 ) -> FDX68Status:
-    """ドライブからディスクイメージを排出する。"""
+    """ドライブからディスクイメージをイジェクトする。"""
     await service.eject(drive_id)
     return await monitor.refresh()
 

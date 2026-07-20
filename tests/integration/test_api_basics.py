@@ -43,7 +43,7 @@ async def test_fddemu_の起動と停止(client: AsyncClient):
     assert stopped.json()["fddemu_running"] is False
 
 
-async def test_挿入と排出(running_client: AsyncClient):
+async def test_挿入とイジェクト(running_client: AsyncClient):
     inserted = await running_client.post("/api/drives/0/insert", json={"path": "disk1.fdx"})
     assert inserted.status_code == 200
 

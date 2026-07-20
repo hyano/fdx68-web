@@ -90,7 +90,7 @@ class FDX68Service:
     async def eject(self, drive_id: int) -> FDX68Status:
         self._validate_drive_id(drive_id)
         await self._backend.eject(drive_id)
-        logger.info("Drive %d を排出しました", drive_id)
+        logger.info("Drive %d をイジェクトしました", drive_id)
         return await self.get_status()
 
     async def set_write_protect(self, drive_id: int, enabled: bool) -> FDX68Status:

@@ -125,7 +125,7 @@ function renderDrives(drives) {
     ejectButton.addEventListener("click", async () => {
       try {
         renderStatus(await api.eject(drive.id));
-        toast(`Drive ${drive.id} を排出しました。`, "success", 3000);
+        toast(`Drive ${drive.id} をイジェクトしました。`, "success", 3000);
       } catch (error) {
         await handleError(error);
       }
