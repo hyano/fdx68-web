@@ -40,6 +40,19 @@ class InvalidPath(FDX68Error):
         super().__init__(message, **kwargs)
 
 
+class InvalidParameter(FDX68Error):
+    """パス以外のリクエスト値が不正。
+
+    パスの不正は InvalidPath を使うこと。
+    例外名と実態を一致させておかないと、ログから原因を追えなくなる。
+    """
+
+    status_code = 400
+
+    def __init__(self, message: str, **kwargs: str) -> None:
+        super().__init__(message, **kwargs)
+
+
 class NotFound(FDX68Error):
     """対象のファイルまたはディレクトリが存在しない。
 

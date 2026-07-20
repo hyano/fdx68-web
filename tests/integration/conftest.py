@@ -10,6 +10,7 @@ import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
+from app.backends.mock import mock_image_bytes
 from app.config import Settings
 from app.main import create_app
 
@@ -23,17 +24,17 @@ def image_root(tmp_path: Path) -> Path:
     root = tmp_path / "fdximg"
     root.mkdir()
 
-    (root / "disk1.fdx").write_bytes(b"FDX68-MOCK-IMAGE\nDisk Name : DISK1\n")
+    (root / "disk1.fdx").write_bytes(mock_image_bytes(disk_name="DISK1"))
     (root / "source.d88").write_bytes(b"D88-DUMMY")
     (root / "readme.txt").write_text("メモ", encoding="utf-8")
 
     game = root / "ゲーム"
     game.mkdir()
     for index in (1, 2, 10):
-        (game / f"disk{index}.fdx").write_bytes(b"FDX68-MOCK-IMAGE\n")
+        (game / f"disk{index}.fdx").write_bytes(mock_image_bytes(disk_name=f"DISK{index}"))
 
     (game / "sub").mkdir()
-    (game / "sub" / "nested.fdx").write_bytes(b"FDX68-MOCK-IMAGE\n")
+    (game / "sub" / "nested.fdx").write_bytes(mock_image_bytes(disk_name="NESTED"))
 
     (root / "empty").mkdir()
 

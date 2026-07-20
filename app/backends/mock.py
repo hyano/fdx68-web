@@ -9,20 +9,80 @@ macOS 上での開発と、CI での Integration Test に使う。
 """
 
 import asyncio
+import json
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from app.backends.base import FDX68Backend
-from app.command.parser import parse_disk_info
-from app.errors import CommandFailed
+from app.errors import CommandFailed, FddemuNotRunning, InvalidParameter, NotFound
 from app.models.drive import Drive, FDX68Status
 from app.models.image import AnalyzeMode, DataFormat, DiskInfo, DiskType
 
 logger = logging.getLogger(__name__)
 
-#: mock が生成する FDX の中身（実際の FDX68 形式ではない）
-_MOCK_FDX_HEADER = b"FDX68-MOCK-IMAGE\n"
+#: mock が生成するファイルの先頭に置く目印。実際の FDX68 形式ではない。
+_MOCK_HEADER = "FDX68-MOCK-IMAGE\n"
+
+#: 2HD は 360rpm、それ以外は 300rpm（X68000 で使うのは 2HD）
+_RPM_BY_DISK_TYPE = {DiskType.TWO_HD: 360}
+_DEFAULT_RPM = 300
+
+
+def mock_image_bytes(
+    *,
+    disk_name: str = "BLANK IMAGE",
+    disk_type: DiskType = DiskType.TWO_HD,
+    write_protected: bool = False,
+    data_format: DataFormat = DataFormat.ENCODE,
+) -> bytes:
+    """mock が扱うディスクイメージのバイト列を組み立てる。
+
+    **これは mock 独自の形式であり、FDX68 の形式ではない。**
+
+    以前は fdxtool の出力を模したテキストを書き、それを本物のパーサーで
+    読み戻していた。その作りだと mock が FDX68 の出力書式に縛られ、
+    実機側の書式が変われば mock とテストのフィクスチャが道連れで壊れる。
+    mock は自分の形式だけを知っていればよいので、独自の JSON にしている。
+
+    テストのフィクスチャからも使えるよう公開している。
+    """
+    payload = {
+        "disk_name": disk_name,
+        "disk_type": disk_type.value,
+        "write_protected": write_protected,
+        "data_format": data_format.value,
+    }
+    return _MOCK_HEADER.encode() + json.dumps(payload, ensure_ascii=False, indent=2).encode()
+
+
+def _decode_mock_image(raw: bytes) -> DiskInfo:
+    """mock 形式のバイト列から DiskInfo を組み立てる。
+
+    mock が作ったものでない場合（開発中に手で置いたファイル等）は、
+    解析できなかった実機と同じく、生の内容だけを保持した DiskInfo を返す。
+    """
+    text = raw.decode("utf-8", errors="replace")
+
+    if not text.startswith(_MOCK_HEADER):
+        return DiskInfo(raw_output=text)
+
+    try:
+        payload = json.loads(text[len(_MOCK_HEADER) :])
+    except ValueError:
+        return DiskInfo(raw_output=text)
+
+    disk_type = payload.get("disk_type")
+    return DiskInfo(
+        name=payload.get("disk_name"),
+        disk_type=disk_type,
+        rpm=_RPM_BY_DISK_TYPE.get(DiskType(disk_type), _DEFAULT_RPM) if disk_type else None,
+        cylinders=77,
+        heads=2,
+        data_format=payload.get("data_format"),
+        write_protected=payload.get("write_protected"),
+        raw_output=text,
+    )
 
 
 @dataclass
@@ -95,22 +155,25 @@ class MockFDX68Backend(FDX68Backend):
 
     # --- ドライブ操作 -------------------------------------------------------
 
-    def _require_running(self) -> None:
-        if not self.fddemu_running:
-            raise CommandFailed("fddemu が起動していません。")
-
     def _require_drive(self, drive_id: int) -> _MockDrive:
-        self._require_running()
+        """操作対象のドライブを返す。
+
+        例外の種類は Real バックエンドと揃えること。
+        ここがずれると、mock で通ったテストが実機で別のステータスになる。
+        """
+        if not self.fddemu_running:
+            raise FddemuNotRunning()
+
         drive = self.drives.get(drive_id)
         if drive is None:
-            raise CommandFailed(f"ドライブ {drive_id} は存在しません。")
+            raise InvalidParameter(f"ドライブ {drive_id} は存在しません。")
         return drive
 
     async def insert(self, drive_id: int, image_path: Path) -> None:
         self.calls.append(f"insert({drive_id}, {image_path})")
         drive = self._require_drive(drive_id)
         if not image_path.exists():
-            raise CommandFailed("指定されたファイルを開けませんでした。")
+            raise NotFound("指定されたファイルを開けませんでした。")
         drive.image = image_path
         drive.cylinder = 0
 
@@ -138,13 +201,13 @@ class MockFDX68Backend(FDX68Backend):
     ) -> None:
         self.calls.append(f"convert_to_fdx({source} -> {destination})")
         if not source.exists():
-            raise CommandFailed("変換元のファイルが存在しません。")
+            raise NotFound("変換元のファイルが存在しません。")
 
         # 実際の変換は行わないが、後続処理のためにファイルは作る。
         # 元ファイルを変更しないことは実機と同じ。
         await asyncio.to_thread(
             destination.write_bytes,
-            _MOCK_FDX_HEADER + f"converted from {source.name}\n".encode(),
+            mock_image_bytes(disk_name=source.stem, data_format=data_format),
         )
 
     async def create_blank_image(
@@ -157,26 +220,21 @@ class MockFDX68Backend(FDX68Backend):
         data_format: DataFormat = DataFormat.ENCODE,
     ) -> None:
         self.calls.append(f"create_blank_image({destination}, {disk_type.value})")
-        name = disk_name or "BLANK IMAGE"
-        rpm = 360 if disk_type is DiskType.TWO_HD else 300
-        content = (
-            _MOCK_FDX_HEADER
-            + f"Disk Name : {name}\n".encode()
-            + f"Disk Type : {disk_type.value}\n".encode()
-            + f"RPM : {rpm}\n".encode()
-            + f"Format : {data_format.value}\n".encode()
-            + f"Protect : {'on' if write_protected else 'off'}\n".encode()
+        content = mock_image_bytes(
+            disk_name=disk_name or "BLANK IMAGE",
+            disk_type=disk_type,
+            write_protected=write_protected,
+            data_format=data_format,
         )
         await asyncio.to_thread(destination.write_bytes, content)
 
     async def get_disk_info(self, path: Path) -> DiskInfo:
         self.calls.append(f"get_disk_info({path})")
         if not path.exists():
-            raise CommandFailed("ファイルが存在しません。")
+            raise NotFound()
 
         raw = await asyncio.to_thread(path.read_bytes)
-        text = raw.decode("utf-8", errors="replace")
-        return parse_disk_info(text)
+        return _decode_mock_image(raw)
 
     async def set_disk_attributes(
         self,
@@ -187,21 +245,26 @@ class MockFDX68Backend(FDX68Backend):
     ) -> None:
         self.calls.append(f"set_disk_attributes({path}, {disk_name}, {write_protected})")
         if not path.exists():
-            raise CommandFailed("ファイルが存在しません。")
+            raise NotFound()
 
         def _update() -> None:
-            text = path.read_text(encoding="utf-8", errors="replace")
-            lines = text.splitlines()
-            updated: list[str] = []
-            for line in lines:
-                lowered = line.lower()
-                if disk_name is not None and lowered.startswith("disk name"):
-                    updated.append(f"Disk Name : {disk_name}")
-                elif write_protected is not None and lowered.startswith("protect"):
-                    updated.append(f"Protect : {'on' if write_protected else 'off'}")
-                else:
-                    updated.append(line)
-            path.write_text("\n".join(updated) + "\n", encoding="utf-8")
+            current = _decode_mock_image(path.read_bytes())
+            path.write_bytes(
+                mock_image_bytes(
+                    disk_name=disk_name if disk_name is not None else (current.name or ""),
+                    disk_type=DiskType(current.disk_type) if current.disk_type else DiskType.TWO_HD,
+                    write_protected=(
+                        write_protected
+                        if write_protected is not None
+                        else bool(current.write_protected)
+                    ),
+                    data_format=(
+                        DataFormat(current.data_format)
+                        if current.data_format
+                        else DataFormat.ENCODE
+                    ),
+                )
+            )
 
         await asyncio.to_thread(_update)
 

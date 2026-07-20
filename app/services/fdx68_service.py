@@ -5,7 +5,7 @@ from pathlib import Path
 
 from app.backends.base import FDX68Backend
 from app.config import Settings
-from app.errors import CommandFailed, InvalidPath, NotFound
+from app.errors import InvalidParameter, NotFound, UnsupportedFileType
 from app.models.drive import FDX68Status
 from app.models.image import ImageKind
 from app.services.image_service import ImageService, classify
@@ -65,7 +65,7 @@ class FDX68Service:
     @staticmethod
     def _validate_drive_id(drive_id: int) -> None:
         if drive_id not in VALID_DRIVE_IDS:
-            raise InvalidPath(f"ドライブ番号は {VALID_DRIVE_IDS} のいずれかです。")
+            raise InvalidParameter(f"ドライブ番号は {VALID_DRIVE_IDS} のいずれかです。")
 
     async def insert(self, drive_id: int, relative: str) -> FDX68Status:
         """ドライブにディスクイメージを挿入する。"""
@@ -79,7 +79,10 @@ class FDX68Service:
             raise NotFound(f"「{Path(relative).name}」が見つかりません。")
 
         if classify(target) is not ImageKind.FDX:
-            raise CommandFailed(
+            # 利用者の選択ミスであってサーバーの障害ではないので 400 を返す。
+            # 同じ条件は image_service の情報取得・属性変更でも
+            # UnsupportedFileType として扱っており、そちらと揃えている。
+            raise UnsupportedFileType(
                 "FDX 形式のイメージのみ挿入できます。他の形式は先に FDX へ変換してください。"
             )
 

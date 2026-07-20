@@ -79,6 +79,22 @@ def create_backend(settings: Settings) -> FDX68Backend:
 散在すると、実機でのみ発生する不具合を macOS 上で再現できなくなり、
 テストの信頼性が下がります。
 
+### Mock は FDX68 の出力書式に依存しない
+
+Mock バックエンドが扱うディスクイメージは、**mock 独自の JSON 形式**です
+（先頭に `FDX68-MOCK-IMAGE` の目印を置き、その後ろに属性を JSON で書く）。
+
+以前は `fdxtool` の出力を模したテキストを書き、それを本物の `parse_disk_info` で
+読み戻していました。この作りだと mock が実機の出力書式に縛られ、
+FDX68 側の書式が変わったときに mock とテストのフィクスチャまで道連れで壊れます。
+
+Mock は自分の形式だけを知っていればよいので、`app/backends/mock.py` の
+`mock_image_bytes()` / `_decode_mock_image()` で完結させています。
+テストのフィクスチャも `mock_image_bytes()` を使います。
+
+Mock が送出する例外の**種類も Real と揃えます**。
+ここがずれると、mock で通ったテストが実機では別の HTTP ステータスになります。
+
 ### `fddctl` の成否は終了コードで判定しない
 
 実測で、`fddemu` が停止している状態の `fddctl -l` が

@@ -56,9 +56,13 @@ async def test_挿入とイジェクト(running_client: AsyncClient):
 
 
 async def test_FDX以外は挿入できない(running_client: AsyncClient):
-    """先に FDX へ変換する必要があることを伝える。"""
+    """先に FDX へ変換する必要があることを伝える。
+
+    これは利用者の選択ミスであってサーバーの障害ではないので 400 を返す。
+    同じ「FDX 形式ではない」条件は情報取得・属性変更でも 400 で揃えている。
+    """
     response = await running_client.post("/api/drives/0/insert", json={"path": "source.d88"})
-    assert response.status_code == 500
+    assert response.status_code == 400
     assert "変換" in response.json()["message"]
 
 
