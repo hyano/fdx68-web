@@ -75,7 +75,8 @@ ok "転送しました"
 
 step "依存パッケージを更新しています"
 
-# shellcheck disable=SC2029  DEPLOY_DIR はローカルで展開したい
+# DEPLOY_DIR はローカルで展開したい
+# shellcheck disable=SC2029
 ssh "${DEPLOY_HOST}" "
 set -e
 cd '${DEPLOY_DIR}'

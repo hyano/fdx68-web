@@ -38,6 +38,7 @@ section "サービスの状態"
 ssh "${DEPLOY_HOST}" "systemctl status fdx68-web --no-pager --lines=0" || true
 
 section "ログ（直近 ${LINES} 行）"
+# shellcheck disable=SC2029
 ssh "${DEPLOY_HOST}" "sudo journalctl -u fdx68-web -n ${LINES} --no-pager" || true
 
 section "fddemu プロセス"
