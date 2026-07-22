@@ -515,6 +515,13 @@ code { font-family: var(--font-mono); font-size: 0.9em; }
   padding: 0;
 }
 
+/*
+ * OK ボタンを DOM 順で先頭に置き、テキスト入力欄で Enter を押したときの
+ * 暗黙送信の既定ボタンにしている（Enter で確定できるようにするため）。
+ * 見た目はキャンセルを左・OK を右に保ちたいので、キャンセルだけ視覚順を前に戻す。
+ */
+.dialog__buttons button[value="cancel"] { order: -1; }
+
 .advanced summary { cursor: pointer; font-size: var(--font-size-small); color: var(--color-text-weak); }
 .advanced { display: grid; gap: var(--space-sm); }
 
