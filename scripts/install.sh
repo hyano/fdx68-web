@@ -9,7 +9,7 @@
 #   ./scripts/install.sh --dry-run    実行計画を表示するだけ
 #   ./scripts/install.sh --uninstall  サービスと設定を削除
 #
-# 詳細は docs/installation.md を参照。
+# 詳細は docs/guide/installation.md を参照。
 
 set -euo pipefail
 
@@ -81,7 +81,7 @@ FDX68 Web Controller インストーラ
   --skip-checksum         SHA256 の照合を省略する（非推奨）
   -h, --help              このヘルプを表示する
 
-詳細は docs/installation.md を参照してください。
+詳細は docs/guide/installation.md を参照してください。
 USAGE
 }
 
@@ -307,7 +307,7 @@ install_fdx68() {
   期待値: ${sha256}
   実際  : ${actual}
 ダウンロードが壊れたか、配布物が更新された可能性があります。
-docs/installation.md のトラブルシューティングを参照してください。"
+docs/guide/installation.md のトラブルシューティングを参照してください。"
         fi
         ok "SHA256 を照合しました"
     fi

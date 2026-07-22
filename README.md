@@ -76,7 +76,7 @@ FDX68 が未導入の場合は、専用シールドの所有を確認したう�
 インストール後、ブラウザで `http://<Raspberry Pi の IP アドレス>:8000` を開いてください。
 
 詳細な手順、手動でのインストール方法、アップデート、アンインストール、
-トラブルシューティングは [docs/installation.md](docs/installation.md) を参照してください。
+トラブルシューティングは [docs/guide/installation.md](docs/guide/installation.md) を参照してください。
 
 ---
 

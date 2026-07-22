@@ -51,7 +51,7 @@ Raspberry Pi は **実装メモリ 415MB / 空き 275MB** しかありません�
 - **`reboot` / `poweroff` / `fddemu` の停止を、確認なしに実行しない。**
   X68000 がディスクにアクセス中の可能性があります。
 - FDX68 の仕様は **公式ドキュメントより実機の挙動を優先**します。
-  食い違いを見つけたら `docs/fdx68-version-notes.md` に記録してください。
+  食い違いを見つけたら `docs/reference/fdx68-version-notes.md` に記録してください。
 
 ### ディスクイメージに関わるもの
 
@@ -90,7 +90,7 @@ uvicorn app.main:app --reload    # http://localhost:8000
 ```
 
 実機への接続は `.env.deploy` に設定します（`.env.deploy.example` を参照）。
-初回のみ `ssh-copy-id` での公開鍵配置が必要です（手順は `docs/deployment.md`）。
+初回のみ `ssh-copy-id` での公開鍵配置が必要です（手順は `docs/development/deployment.md`）。
 
 ---
 
@@ -105,7 +105,7 @@ uvicorn app.main:app --reload    # http://localhost:8000
 | API を追加した | `tests/integration/` とフロントエンド（`frontend/js/api.js`）の両方 |
 | UI に要素を追加した | JS からインライン style を書かず `data-*` 属性と CSS で表現する |
 | FDX68 の新版に対応した | `packaging/fdx68-source.conf` の 3 値（バージョン・URL・SHA256）と `CHANGELOG.md` |
-| 実機で仕様を確認した | `docs/fdx68-version-notes.md` |
+| 実機で仕様を確認した | `docs/reference/fdx68-version-notes.md` |
 
 ---
 
@@ -155,4 +155,4 @@ FDX68 そのものが日本語で提供されており、利用者層も日本�
 - `fddemu` は `/dev/mem` を使うため **root 権限が必須**です
 - **FDX68 本体は再配布できません。** リポジトリへの同梱や GitHub Release へのミラーは禁止です。
   `install.sh` は公式サイトから直接ダウンロードします（専用シールド所有の確認を経たうえで）。
-- コマンドの詳細は `docs/fdx68-reference.md`、実機との差異は `docs/fdx68-version-notes.md` に記録しています。
+- コマンドの詳細は `docs/reference/fdx68-reference.md`、実機との差異は `docs/reference/fdx68-version-notes.md` に記録しています。

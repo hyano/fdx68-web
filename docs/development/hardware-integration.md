@@ -172,7 +172,7 @@ X68000 のソフトはディレクトリ名を日本語で管理することが�
 
 ## 結果の記録
 
-未確定事項の確認結果は [fdx68-version-notes.md](fdx68-version-notes.md) に追記してください。
+未確定事項の確認結果は [fdx68-version-notes.md](../reference/fdx68-version-notes.md) に追記してください。
 挙動が公式ドキュメントと異なっていた場合は、その差異も記録します。
 
 問題が見つかった場合は、再現手順とともに Issue に記録してください。

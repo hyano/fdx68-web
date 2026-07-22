@@ -1,7 +1,7 @@
 """FDX68 コマンドの出力パーサー。
 
 実機（FDX68 2.1.0）の出力形式に合わせている。
-公式ドキュメントとの差異は docs/fdx68-version-notes.md を参照。
+公式ドキュメントとの差異は docs/reference/fdx68-version-notes.md を参照。
 """
 
 import re

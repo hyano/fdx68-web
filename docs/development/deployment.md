@@ -1,7 +1,7 @@
 # デプロイと運用
 
 このドキュメントは**開発中の反復デプロイ**（macOS から実機へ）について書いています。
-第三者が素の Raspberry Pi OS に導入する手順は [installation.md](installation.md) を参照してください。
+第三者が素の Raspberry Pi OS に導入する手順は [installation.md](../guide/installation.md) を参照してください。
 
 ---
 

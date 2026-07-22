@@ -1,7 +1,7 @@
 /*
  * FDX68 Web Controller のフロントエンド本体。
  *
- * 表示は常に古くなりうる前提で作っている（docs/ui-guidelines.md 参照）。
+ * 表示は常に古くなりうる前提で作っている（docs/development/ui-guidelines.md 参照）。
  * イメージディレクトリは Web UI 以外（rsync、SSH、別のタブ）からも変更されるため。
  */
 

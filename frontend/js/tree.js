@@ -1,7 +1,7 @@
 /*
  * イメージブラウザのツリー。
  *
- * 方針（docs/ui-guidelines.md 参照）:
+ * 方針（docs/development/ui-guidelines.md 参照）:
  *  - 展開時に遅延読み込みする（全階層を一度に読まない）
  *  - 展開状態は localStorage に保存し、再読み込み後も復帰する
  *  - ファイル操作の後は影響を受けたノードだけを再取得する

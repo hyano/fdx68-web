@@ -164,7 +164,7 @@ shellcheck scripts/*.sh
 
 ただし、これでは**真に素の環境での検証にはなりません**。
 クリーンな環境での確認には予備の SD カードが必要です。
-手順は [installation.md](installation.md) の手動チェックリストに記載しています。
+手順は [installation.md](../guide/installation.md) の手動チェックリストに記載しています。
 
 ---
 

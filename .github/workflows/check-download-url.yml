@@ -43,6 +43,6 @@ jobs:
             echo "FDX68 の配布 URL に到達できませんでした。"
             echo "公式サイト http://retropc.net/gimons/fdx68/ を確認し、"
             echo "packaging/fdx68-source.conf を更新してください。"
-            echo "手順は docs/installation.md を参照してください。"
+            echo "手順は docs/guide/installation.md を参照してください。"
             exit 1
           fi

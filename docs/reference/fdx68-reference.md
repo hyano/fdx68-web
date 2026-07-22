@@ -293,4 +293,4 @@ GPIO を直接マップするため root 権限が必要です。
 | `fdx68_210_bm.zip` | fddemu のベアメタル版 |
 
 **64bit 版に固定 URL は存在しません。** 詳細と、それを踏まえたインストーラの設計は
-[installation.md](installation.md) を参照してください。
+[installation.md](../guide/installation.md) を参照してください。

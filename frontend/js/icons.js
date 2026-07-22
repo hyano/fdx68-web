@@ -13,7 +13,7 @@
  * 行のインデントだけでなくアイコン自体でも開いているかが分かるようにしている。
  *
  * 5.25 インチのフロッピーを描いた SVG に差し替える際の方針は
- * docs/ui-guidelines.md を参照。
+ * docs/development/ui-guidelines.md を参照。
  */
 
 export const ICONS = {
