@@ -30,9 +30,10 @@
   --color-running: #2e8b57;
   --color-stopped: #8a919e;
   --color-mounted: #2f6fd0;
+  --color-mounted-fg: #ffffff;
   --color-drop: #2f6fd0;
   --color-drop-bg: #e6efff;
-  /* 選択は背景＋枠線で示す。挿入中は左端の帯なので表現がぶつからない */
+  /* 選択は背景＋枠線で示す。挿入中はバッジなので表現がぶつからない */
   --color-selected-bg: #cfdff5;
   --color-selected-bg-hover: #bed3f2;
   --color-selected-border: #2f6fd0;
@@ -85,6 +86,8 @@
     --color-warning: #d9a441;
 
     --color-mounted: #5b9bf0;
+    /* 明るい青の上では白が沈むため、挿入中バッジの文字は暗い側に持ち替える */
+    --color-mounted-fg: #1b1f27;
     --color-drop: #5b9bf0;
     --color-drop-bg: #29354a;
     --color-selected-bg: #35435c;
