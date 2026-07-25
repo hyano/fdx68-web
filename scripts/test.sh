@@ -47,7 +47,7 @@ ok "フォーマットは適切です"
 
 step "シェルスクリプトの静的解析（shellcheck）"
 if command -v shellcheck >/dev/null 2>&1; then
-    shellcheck scripts/*.sh
+    shellcheck scripts/*.sh scripts/ci/*.sh
     ok "shellcheck に成功しました"
 else
     # 導入されていない環境でもテスト全体を失敗させない（CI では必ず実行される）

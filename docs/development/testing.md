@@ -153,20 +153,49 @@ FastAPI アプリケーション全体を Mock バックエンドで動かしま
 ## インストーラのテスト
 
 ```bash
-shellcheck scripts/*.sh
+shellcheck scripts/*.sh scripts/ci/*.sh
 ./scripts/install.sh --dry-run
 ```
 
 `--dry-run` は実行計画を表示するだけで、何も変更しません。
 どちらも `./scripts/test.sh` に含まれているため、通常は個別に実行する必要はありません。
 
-CI は `ubuntu-latest`（x86_64）で dry-run を実行します。FDX68 は aarch64 / armhf 向けにしか
-配布されていないため、対象外のアーキテクチャでは dry-run に限り警告を出して導入手順を飛ばします
-（実際の導入では従来どおりエラーで中止します）。開発ホストが Apple Silicon の場合は
-`arm64` と判定されて実機と同じ経路を通るので、x86_64 側の経路は CI でのみ検証されます。
+ローカルで実行するのは dry-run までです。実際のインストールは `/etc` と systemd を触るため、
+開発ホストでは走らせません（macOS では実機コマンドを実行しない、という前提もあります）。
 
-加えて、**既存の Raspberry Pi で 2 回連続実行し、2 回目が何も壊さないこと（冪等性）**を
-確認します。特に `.env` とイメージディレクトリの中身が変化しないことが重要です。
+### CI での実インストール
+
+dry-run は分岐が壊れていないことしか見ません。`run()` の中身（venv 作成・pip・sudoers 設置・
+systemd 起動・疎通確認）とダウンロード経路は一度も実行されないため、
+systemd unit や sudoers のテンプレートを壊しても dry-run は通ってしまいます。
+
+そこで CI では、**FDX68 コマンドのスタブを生成して `install.sh` を非 dry-run で最後まで実行**します。
+スタブは `scripts/ci/make-fdx68-stub.sh` が生成します（CI 専用。実機では絶対に使いません）。
+FDX68 本体は再配布できないため CI に置けませんが、検証したいのは `install.sh` とパッケージングであって
+FDX68 そのものではないので、これで目的を達成できます。
+
+| ジョブ | ランナー | 検証する範囲 |
+|---|---|---|
+| `install` | `ubuntu-latest`（x86_64） | FDX68 が導入済みの状態からの経路。venv・`.env` 生成・sudoers・systemd・疎通確認・再実行・`--uninstall` |
+| `install-arm` | `ubuntu-24.04-arm` | 上に加えて FDX68 の取得経路。`--fdx68-url` → SHA256 照合 → 展開 → ELF アーキテクチャ検証 → 配置 |
+
+`install-arm` は実機と同じ `aarch64` として判定されるため、アーキテクチャ判定と
+ダウンロード物の ELF 検証が実際に効きます。ダウンロード元にはスタブから作った tarball を
+`file://` で渡すので、retropc.net には一切アクセスしません。
+SHA256 が一致しないときに中止することも、わざと誤った値を渡して確認しています。
+
+**CI が緑でも FDX68 本体そのものは検証していません。** スタブはそれらしい出力を返すだけで、
+GPIO も FDD 信号も扱いません。
+
+x86_64 では FDX68 が配布されていないため、対象外のアーキテクチャでは dry-run に限り
+警告を出して導入手順を飛ばします（実際の導入では従来どおりエラーで中止します）。
+開発ホストが Apple Silicon の場合は `arm64` と判定されて実機と同じ経路を通るので、
+x86_64 側の経路は CI でのみ検証されます。
+
+### 実機での確認
+
+**既存の Raspberry Pi で 2 回連続実行し、2 回目が何も壊さないこと（冪等性）**を確認します。
+特に `.env` とイメージディレクトリの中身が変化しないことが重要です。
 
 ただし、これでは**真に素の環境での検証にはなりません**。
 クリーンな環境での確認には予備の SD カードが必要です。
@@ -180,8 +209,9 @@ CI は `ubuntu-latest`（x86_64）で dry-run を実行します。FDX68 は aar
 
 - ruff（lint / format check）
 - pytest（Unit + Integration、`FDX68_BACKEND=mock`）
-- shellcheck（`scripts/*.sh`）
+- shellcheck（`scripts/*.sh` / `scripts/ci/*.sh`）
 - `install.sh --dry-run`
+- **FDX68 のスタブを使った実インストール**（x86_64 と aarch64。前節を参照）
 - **Python 3.11 と 3.13 のマトリクス**（Bookworm / Trixie 相当）
 
 3.11 を含めるのは、Bookworm で動かない構文を使ってしまう事故を防ぐためです。

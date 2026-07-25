@@ -18,9 +18,9 @@ jobs:
         python-version: ["3.11", "3.13"]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -48,14 +48,143 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: shellcheck
         run: |
           sudo apt-get update
           sudo apt-get install -y shellcheck
-          shellcheck scripts/*.sh
+          shellcheck scripts/*.sh scripts/ci/*.sh
 
       - name: install.sh の dry-run
-        # 実際には何も変更しないことと、分岐が壊れていないことを確認する
+        # 実際には何も変更しないことと、分岐が壊れていないことを確認する。
+        # FDX68 が導入されていない環境の経路は、この dry-run でしか通らない。
         run: ./scripts/install.sh --dry-run
+
+  install:
+    name: インストーラの実行（FDX68 導入済み）
+    runs-on: ubuntu-latest
+    # ホストランナー（VM）で直接実行する。install.sh は root 実行を拒否し、
+    # systemd を必要とするため、コンテナでは検証できない。
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: FDX68 のスタブを配置
+        # 本体は再配布できないため、振る舞いだけを模したスタブを使う。
+        # これが /usr/local/bin にあると install.sh は「導入済み」の経路を通る。
+        run: |
+          scripts/ci/make-fdx68-stub.sh "${RUNNER_TEMP}/fdx68-stub"
+          find "${RUNNER_TEMP}/fdx68-stub" -maxdepth 1 -type f -perm -u+x \
+              -exec sudo install -o root -g root -m 0755 {} /usr/local/bin/ \;
+
+      - name: install.sh の実行
+        run: ./scripts/install.sh --yes
+
+      - name: 導入結果の確認
+        run: |
+          set -x
+          systemctl is-active fdx68-web
+          sudo visudo -c -f /etc/sudoers.d/fdx68-web
+          grep -q '^FDX68_BACKEND=real$' .env
+          grep -q "^FDX68_IMAGE_DIR=${HOME}/fdximg$" .env
+          test -d "${HOME}/fdximg"
+          curl -fsS http://127.0.0.1:8000/api/health
+          # スタブの fddctl -l を解析できているか、つまり real バックエンドが
+          # 端から端まで動いているかまで見る
+          curl -fsS -o "${RUNNER_TEMP}/status.json" http://127.0.0.1:8000/api/status
+          cat "${RUNNER_TEMP}/status.json"
+          grep -q '"fddemu_running":true' "${RUNNER_TEMP}/status.json"
+
+      - name: 再実行（冪等性の確認）
+        # 再実行がそのままアップデート手順になる、という前提を壊していないこと
+        run: ./scripts/install.sh --yes
+
+      - name: アンインストール
+        run: |
+          set -x
+          ./scripts/install.sh --uninstall --yes
+          ! systemctl list-unit-files | grep -q '^fdx68-web\.service'
+          test ! -f /etc/sudoers.d/fdx68-web
+          # 設定とディスクイメージの置き場は消さない（install.sh の約束）
+          test -f .env
+          test -d "${HOME}/fdximg"
+
+      - name: 失敗時のログ
+        if: failure()
+        run: |
+          sudo systemctl status fdx68-web --no-pager || true
+          sudo journalctl -u fdx68-web -n 100 --no-pager || true
+
+  install-arm:
+    name: インストーラの実行（FDX68 の取得から）
+    runs-on: ubuntu-24.04-arm
+    # 実機（Raspberry Pi）と同じ aarch64 なので、アーキテクチャ判定と
+    # ダウンロード物の ELF 検証まで含めて本番と同じ経路を通せる。
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: FDX68 のスタブ tarball を作成
+        # 実配布物と同じフラット構造（トップレベルディレクトリを持たない）にする
+        run: |
+          scripts/ci/make-fdx68-stub.sh "${RUNNER_TEMP}/fdx68-stub" --elf-fddemu
+          tar czf "${RUNNER_TEMP}/fdx68-stub.tar.gz" -C "${RUNNER_TEMP}/fdx68-stub" .
+          echo "STUB_SHA256=$(sha256sum "${RUNNER_TEMP}/fdx68-stub.tar.gz" | cut -d' ' -f1)" >> "${GITHUB_ENV}"
+
+      - name: SHA256 の不一致を検出できること
+        # 配布が HTTP（平文）である以上、この検査は退行させられない
+        env:
+          FDX68_SHA256_OVERRIDE: "0000000000000000000000000000000000000000000000000000000000000000"
+        run: |
+          if ./scripts/install.sh --yes --i-own-fdx68-shield \
+              --fdx68-url "file://${RUNNER_TEMP}/fdx68-stub.tar.gz" \
+              > "${RUNNER_TEMP}/install.log" 2>&1; then
+              echo "SHA256 が一致しないのにインストールが成功してしまいました" >&2
+              cat "${RUNNER_TEMP}/install.log" >&2
+              exit 1
+          fi
+          cat "${RUNNER_TEMP}/install.log"
+          grep -q 'SHA256 が一致しません' "${RUNNER_TEMP}/install.log"
+          test ! -e /usr/local/bin/fddemu
+
+      - name: install.sh の実行（ダウンロードから）
+        run: |
+          FDX68_SHA256_OVERRIDE="${STUB_SHA256}" \
+              ./scripts/install.sh --yes --i-own-fdx68-shield \
+              --fdx68-url "file://${RUNNER_TEMP}/fdx68-stub.tar.gz"
+
+      - name: 導入結果の確認
+        run: |
+          set -x
+          for command_name in fddemu fddctl fdxconv fdxtool; do
+              test -x "/usr/local/bin/${command_name}"
+          done
+          file_info="$(file -b /usr/local/bin/fddemu)"
+          echo "${file_info}"
+          case "${file_info}" in
+              *"ELF 64-bit"*aarch64*) ;;
+              *) echo "aarch64 の ELF が配置されていません" >&2; exit 1 ;;
+          esac
+          systemctl is-active fdx68-web
+          sudo visudo -c -f /etc/sudoers.d/fdx68-web
+          curl -fsS http://127.0.0.1:8000/api/health
+          curl -fsS -o "${RUNNER_TEMP}/status.json" http://127.0.0.1:8000/api/status
+          cat "${RUNNER_TEMP}/status.json"
+          grep -q '"fddemu_running":true' "${RUNNER_TEMP}/status.json"
+
+      - name: 再実行（冪等性の確認）
+        run: ./scripts/install.sh --yes
+
+      - name: アンインストール
+        run: |
+          set -x
+          ./scripts/install.sh --uninstall --yes
+          ! systemctl list-unit-files | grep -q '^fdx68-web\.service'
+          test ! -f /etc/sudoers.d/fdx68-web
+
+      - name: 失敗時のログ
+        if: failure()
+        run: |
+          sudo systemctl status fdx68-web --no-pager || true
+          sudo journalctl -u fdx68-web -n 100 --no-pager || true
