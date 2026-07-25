@@ -9,7 +9,7 @@
 | Hardware Integration Test | Raspberry Pi + X68000 実機 | 手動チェックリスト |
 
 ```bash
-./scripts/test.sh    # Unit → Integration → ruff → shellcheck
+./scripts/test.sh    # Unit → Integration → ruff → shellcheck → dry-run
 ```
 
 いずれかが失敗した時点で非ゼロ終了し、`deploy.sh` はデプロイを中止します。
@@ -158,6 +158,12 @@ shellcheck scripts/*.sh
 ```
 
 `--dry-run` は実行計画を表示するだけで、何も変更しません。
+どちらも `./scripts/test.sh` に含まれているため、通常は個別に実行する必要はありません。
+
+CI は `ubuntu-latest`（x86_64）で dry-run を実行します。FDX68 は aarch64 / armhf 向けにしか
+配布されていないため、対象外のアーキテクチャでは dry-run に限り警告を出して導入手順を飛ばします
+（実際の導入では従来どおりエラーで中止します）。開発ホストが Apple Silicon の場合は
+`arm64` と判定されて実機と同じ経路を通るので、x86_64 側の経路は CI でのみ検証されます。
 
 加えて、**既存の Raspberry Pi で 2 回連続実行し、2 回目が何も壊さないこと（冪等性）**を
 確認します。特に `.env` とイメージディレクトリの中身が変化しないことが重要です。

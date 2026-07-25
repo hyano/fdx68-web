@@ -99,7 +99,7 @@ macOS では `testdata/images` などローカルのディレクトリを指定�
 ./scripts/test.sh
 ```
 
-Unit Test → Integration Test → ruff → shellcheck の順に実行し、
+Unit Test → Integration Test → ruff → shellcheck → install.sh --dry-run の順に実行し、
 いずれかが失敗した時点で非ゼロで終了します。
 
 個別に実行する場合:

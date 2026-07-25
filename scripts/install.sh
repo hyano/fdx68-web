@@ -187,14 +187,13 @@ esac
 
 ARCH="$(uname -m)"
 case "${ARCH}" in
-    aarch64|arm64) FDX68_ARCH="aarch64" ;;
-    armv7l|armv6l|armhf) FDX68_ARCH="armhf" ;;
+    aarch64|arm64) FDX68_ARCH="aarch64"; ok "アーキテクチャ: ${ARCH}" ;;
+    armv7l|armv6l|armhf) FDX68_ARCH="armhf"; ok "アーキテクチャ: ${ARCH}" ;;
     *)
-        warn "アーキテクチャ ${ARCH} は FDX68 の対象外です。"
         FDX68_ARCH=""
+        warn "アーキテクチャ: ${ARCH}（FDX68 の対象外です）"
         ;;
 esac
-ok "アーキテクチャ: ${ARCH}"
 
 if [ -r /proc/device-tree/model ]; then
     ok "モデル: $(tr -d '\0' < /proc/device-tree/model)"
@@ -227,7 +226,15 @@ find_fdx68() {
 }
 
 install_fdx68() {
-    [ -z "${FDX68_ARCH}" ] && fail "このアーキテクチャ（${ARCH}）向けの FDX68 は配布されていません。"
+    if [ -z "${FDX68_ARCH}" ]; then
+        # dry-run では実際の導入を行わないため、対象外のアーキテクチャでも
+        # 以降の分岐を確認できるように続行する（CI は x86_64 で実行される）
+        if [ "${DRY_RUN}" = true ]; then
+            warn "このアーキテクチャ（${ARCH}）向けの FDX68 は配布されていないため、導入手順は確認できません。"
+            return
+        fi
+        fail "このアーキテクチャ（${ARCH}）向けの FDX68 は配布されていません。"
+    fi
     [ -r "${SOURCE_CONF}" ] || fail "配布元の定義が見つかりません: ${SOURCE_CONF}"
 
     # shellcheck disable=SC1090

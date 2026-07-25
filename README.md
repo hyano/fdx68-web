@@ -120,7 +120,7 @@ uvicorn app.main:app --reload
 ```
 
 ```bash
-./scripts/test.sh         # Unit → Integration → ruff → shellcheck
+./scripts/test.sh         # Unit → Integration → ruff → shellcheck → dry-run
 ./scripts/deploy.sh       # 実機へ rsync して再起動（テストが通らなければ中止）
 ./scripts/logs.sh         # 実機のログとドライブ状態を取得
 ```

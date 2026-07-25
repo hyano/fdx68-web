@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Unit Test → Integration Test → ruff → shellcheck の順に実行する。
+# Unit Test → Integration Test → ruff → shellcheck → install.sh --dry-run の順に実行する。
 # いずれかが失敗した時点で非ゼロで終了し、deploy.sh はデプロイを中止する。
 
 set -euo pipefail
@@ -53,5 +53,11 @@ else
     # 導入されていない環境でもテスト全体を失敗させない（CI では必ず実行される）
     warn "shellcheck が見つかりません（brew install shellcheck で導入できます）"
 fi
+
+step "インストーラの dry-run"
+# 何も変更せずに最後まで通ることを確認する。
+# CI は x86_64 で実行されるため、開発ホストと違うアーキテクチャの経路も壊さないこと。
+./scripts/install.sh --dry-run >/dev/null
+ok "install.sh --dry-run に成功しました"
 
 printf '\n%s%sすべてのテストに成功しました。%s\n' "${C_GREEN}" "${C_BOLD}" "${C_RESET}"

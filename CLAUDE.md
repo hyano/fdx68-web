@@ -77,7 +77,7 @@ Raspberry Pi は **実装メモリ 415MB / 空き 275MB** しかありません�
 ## 作業手順
 
 ```bash
-./scripts/test.sh      # Unit → Integration → ruff → shellcheck
+./scripts/test.sh      # Unit → Integration → ruff → shellcheck → dry-run
 ./scripts/deploy.sh    # テストが通らなければデプロイしない
 ./scripts/logs.sh      # 実機のサービス状態・ログ・fddctl -l をまとめて取得
 ```
