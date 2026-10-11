@@ -8,6 +8,8 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.responses import Response
+from starlette.types import Scope
 
 from app.api import drives, images, status, system, ws
 from app.backends.base import FDX68Backend
@@ -126,6 +128,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     return app
 
 
+class _RevalidatingStaticFiles(StaticFiles):
+    """毎回サーバに更新の有無を問い合わせさせる静的ファイル配信。
+
+    Cache-Control がないとブラウザは Last-Modified から鮮度を推測し、
+    古い JS を数日間使い続けることがある。HTML だけ新しく JS が古いと、
+    デプロイした機能が一部の操作でだけ効かないという分かりにくい不具合になる。
+    no-cache でも ETag による 304 が返るので、転送量はほとんど増えない。
+    """
+
+    async def get_response(self, path: str, scope: Scope) -> Response:
+        response = await super().get_response(path, scope)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
+
 def _mount_frontend(app: FastAPI) -> None:
     """フロントエンドの静的ファイルを配信する。"""
     if not FRONTEND_DIR.exists():
@@ -144,7 +161,7 @@ def _mount_frontend(app: FastAPI) -> None:
     for name in ("css", "js"):
         directory = FRONTEND_DIR / name
         if directory.exists():
-            app.mount(f"/{name}", StaticFiles(directory=directory), name=name)
+            app.mount(f"/{name}", _RevalidatingStaticFiles(directory=directory), name=name)
 
     @app.get("/", include_in_schema=False)
     async def index() -> FileResponse:

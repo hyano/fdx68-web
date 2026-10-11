@@ -157,3 +157,17 @@ async def test_ルート外の一覧は拒否される(client: AsyncClient):
 async def test_存在しないフォルダは404(client: AsyncClient):
     response = await client.get("/api/images", params={"path": "missing"})
     assert response.status_code == 404
+
+
+async def test_JSとCSSは毎回再検証させる(client: AsyncClient):
+    """古い JS がキャッシュに残ると、デプロイした機能が効かないことがある。"""
+    for url in ("/js/app.js", "/js/api.js", "/css/style.css"):
+        response = await client.get(url)
+        assert response.status_code == 200
+        assert response.headers["cache-control"] == "no-cache"
+
+
+async def test_変更がなければ304を返す(client: AsyncClient):
+    first = await client.get("/js/app.js")
+    second = await client.get("/js/app.js", headers={"If-None-Match": first.headers["etag"]})
+    assert second.status_code == 304
