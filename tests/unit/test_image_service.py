@@ -69,3 +69,18 @@ def test_複製名は連番で生成される(tmp_path: Path):
     second.write_bytes(b"")
     third = ImageService._next_copy_name(source)
     assert third.name == "disk copy 3.fdx"
+
+
+def test_変換先の衝突判定は拡張子の大文字小文字を区別しない(tmp_path: Path):
+    (tmp_path / "GAME.FDX").write_bytes(b"")
+
+    found = ImageService._find_existing_fdx(tmp_path / "GAME.fdx")
+    assert found is not None
+    assert found.name == "GAME.FDX"
+
+
+def test_変換先と衝突しないFDXは無視する(tmp_path: Path):
+    (tmp_path / "other.fdx").write_bytes(b"")
+    (tmp_path / "game.d88").write_bytes(b"")
+
+    assert ImageService._find_existing_fdx(tmp_path / "game.fdx") is None

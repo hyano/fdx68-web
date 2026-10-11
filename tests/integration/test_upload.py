@@ -147,3 +147,97 @@ async def test_ルート外へのアップロードは拒否される(client: As
         "/api/images/upload", data={"path": "../"}, files=_file("evil.fdx")
     )
     assert response.status_code == 400
+
+
+# --- 自動変換 ---------------------------------------------------------------
+
+
+def _auto(path: str = "") -> dict[str, str]:
+    return {"path": path, "auto_convert": "true"}
+
+
+async def test_自動変換で元ファイルとFDXの両方が残る(client: AsyncClient, image_root: Path):
+    response = await client.post("/api/images/upload", data=_auto(), files=_file("game.d88"))
+    result = response.json()["results"][0]
+
+    assert result["success"] is True
+    assert result["path"] == "game.d88"
+    assert result["converted_path"] == "game.fdx"
+    assert result["message"] is None
+    assert (image_root / "game.d88").exists()
+    assert (image_root / "game.fdx").exists()
+
+
+async def test_自動変換はフォルダ内に変換先を作る(client: AsyncClient, image_root: Path):
+    response = await client.post(
+        "/api/images/upload", data=_auto("ゲーム"), files=_file("game.xdf")
+    )
+    assert response.json()["results"][0]["converted_path"] == "ゲーム/game.fdx"
+    assert (image_root / "ゲーム" / "game.fdx").exists()
+
+
+async def test_FDXは自動変換の対象にならない(client: AsyncClient, image_root: Path):
+    response = await client.post("/api/images/upload", data=_auto(), files=_file("new.fdx"))
+    result = response.json()["results"][0]
+
+    assert result["success"] is True
+    assert result["converted_path"] is None
+
+
+async def test_自動変換の指定がなければ変換しない(client: AsyncClient, image_root: Path):
+    """API の既定は従来通り。"""
+    response = await client.post("/api/images/upload", data={"path": ""}, files=_file("game.d88"))
+    assert response.json()["results"][0]["converted_path"] is None
+    assert not (image_root / "game.fdx").exists()
+
+
+async def test_変換先のFDXが既にあれば上書きせず元ファイルだけ保存する(
+    client: AsyncClient, image_root: Path
+):
+    """既存の FDX は実機で書き込まれたセーブディスクかもしれない。"""
+    before = (image_root / "disk1.fdx").read_bytes()
+
+    response = await client.post("/api/images/upload", data=_auto(), files=_file("disk1.d88"))
+    result = response.json()["results"][0]
+
+    assert result["success"] is True
+    assert result["converted_path"] is None
+    assert "disk1.fdx" in result["message"]
+    assert (image_root / "disk1.d88").exists()
+    assert (image_root / "disk1.fdx").read_bytes() == before
+
+
+async def test_拡張子の大文字小文字だけ違うFDXも既存として扱う(
+    client: AsyncClient, image_root: Path
+):
+    """Pi の ext4 では GAME.FDX と GAME.fdx が共存できてしまうため。"""
+    (image_root / "GAME.FDX").write_bytes(b"EXISTING")
+
+    response = await client.post("/api/images/upload", data=_auto(), files=_file("GAME.D88"))
+    result = response.json()["results"][0]
+
+    assert result["success"] is True
+    assert result["converted_path"] is None
+    assert "GAME.FDX" in result["message"]
+    assert (image_root / "GAME.FDX").read_bytes() == b"EXISTING"
+    assert "GAME.fdx" not in [p.name for p in image_root.iterdir()]
+
+
+async def test_同じリクエスト内で変換先が衝突したら先の方だけ変換する(
+    client: AsyncClient, image_root: Path
+):
+    response = await client.post(
+        "/api/images/upload",
+        data=_auto(),
+        files=[
+            ("files", ("game.d88", b"D88", "application/octet-stream")),
+            ("files", ("game.xdf", b"XDF", "application/octet-stream")),
+        ],
+    )
+    first, second = response.json()["results"]
+
+    assert first["converted_path"] == "game.fdx"
+    assert second["success"] is True
+    assert second["converted_path"] is None
+    assert second["message"] is not None
+    assert (image_root / "game.xdf").exists()

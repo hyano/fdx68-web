@@ -50,7 +50,11 @@ const elements = {
   bulkBar: document.getElementById("bulk-bar"),
   bulkCount: document.getElementById("bulk-count"),
   fileInput: document.getElementById("file-input"),
+  autoConvert: document.getElementById("upload-auto-convert"),
 };
+
+/** 「FDX に自動変換」の選択状態を保存する localStorage のキー。 */
+const AUTO_CONVERT_KEY = "fdx68.upload.autoConvert";
 
 const state = {
   /** 最新のドライブ状態（id → Drive）。イベントリスナーはここから現在値を読む */
@@ -707,6 +711,22 @@ document.getElementById("btn-upload").addEventListener("click", () => {
   elements.fileInput.click();
 });
 
+// 自動変換の選択状態は既定オンで、変更したらブラウザに記憶する
+try {
+  const stored = localStorage.getItem(AUTO_CONVERT_KEY);
+  if (stored !== null) elements.autoConvert.checked = stored === "true";
+} catch {
+  // 読めなければ既定値のまま
+}
+
+elements.autoConvert.addEventListener("change", () => {
+  try {
+    localStorage.setItem(AUTO_CONVERT_KEY, String(elements.autoConvert.checked));
+  } catch {
+    // プライベートモード等で保存できなくても機能自体は動く
+  }
+});
+
 elements.fileInput.addEventListener("change", async () => {
   const files = [...elements.fileInput.files];
   elements.fileInput.value = "";
@@ -861,6 +881,7 @@ async function uploadFiles(destDir, files) {
 
   state.uploading = true;
   const template = document.getElementById("tpl-upload");
+  const autoConvert = elements.autoConvert.checked;
 
   // 並行させず 1 つずつ順に送る。Pi の CPU と SD カード I/O を飽和させないため。
   for (const file of files) {
@@ -873,10 +894,20 @@ async function uploadFiles(destDir, files) {
     status.textContent = "送信中…";
     elements.uploads.append(row);
 
+    // アップロードできる形式は FDX と変換可能形式だけなので、FDX 以外は変換対象になる
+    const willConvert = autoConvert && !file.name.toLowerCase().endsWith(".fdx");
+
     try {
-      const result = await api.upload(destDir, file, (percent) => {
-        progress.value = percent;
-      });
+      const result = await api.upload(
+        destDir,
+        file,
+        (percent) => {
+          progress.value = percent;
+          // 送信が終わってもサーバ側の変換が終わるまで応答は返らない
+          if (percent === 100 && willConvert) status.textContent = "変換中…";
+        },
+        { autoConvert }
+      );
 
       const entry = result?.results?.[0];
       if (entry && !entry.success) {
@@ -885,8 +916,12 @@ async function uploadFiles(destDir, files) {
         toast(`${file.name}: ${entry.message}`, "error", 0);
       } else {
         progress.value = 100;
-        status.textContent = "完了";
+        status.textContent = entry?.converted_path ? "完了（FDX に変換）" : "完了";
         setTimeout(() => row.remove(), 4000);
+        if (entry?.message) {
+          // アップロードは成功したが変換できなかった。元ファイルから手動で変換し直せる。
+          toast(`${file.name}: ${entry.message}`, "warning", 0);
+        }
       }
     } catch (error) {
       row.remove();

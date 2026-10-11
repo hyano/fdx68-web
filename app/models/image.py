@@ -133,6 +133,9 @@ class OperationResult(BaseModel):
     path: str
     success: bool
     message: str | None = None
+    converted_path: str | None = Field(
+        default=None, description="アップロード時の自動変換で生成した FDX の相対パス"
+    )
 
 
 class BulkResult(BaseModel):

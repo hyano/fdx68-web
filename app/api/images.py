@@ -13,17 +13,19 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.deps import ImageServiceDep, StatusMonitorDep
-from app.errors import FDX68Error
+from app.errors import AlreadyExists, FDX68Error
 from app.models.image import (
     AnalyzeMode,
     BulkResult,
     DataFormat,
     DiskInfo,
     DiskType,
+    ImageKind,
     ImageListing,
     OperationResult,
     PathResponse,
 )
+from app.services.image_service import ImageService, classify
 from app.services.paths import parent_of
 
 logger = logging.getLogger(__name__)
@@ -221,10 +223,15 @@ async def upload(
     monitor: StatusMonitorDep,
     path: str = Form(default=""),
     files: list[UploadFile] = File(...),
+    auto_convert: bool = Form(default=False),
 ) -> BulkResult:
     """ディスクイメージをアップロードする。
 
     1 ファイルずつ順に処理し、途中で失敗しても残りを続ける。
+
+    `auto_convert` が真なら、保存できた変換可能イメージを続けて FDX に変換する。
+    変換オプションは既定値（D88 マルチイメージは 1 枚目、encode、upd765）で、
+    それ以外が必要なら元ファイルを手動で変換し直す。
     """
     # 保存先の検証はリクエスト全体に関わるため、ループの前に一度だけ行う。
     # ここで失敗したらどのファイルも保存できないので、個別の失敗として
@@ -245,10 +252,37 @@ async def upload(
         name_of=lambda f: f.filename or "",
     )
 
+    if auto_convert:
+        # 保存がすべて終わってから変換する。同じリクエスト内で変換先が衝突した場合
+        # （game.d88 と game.xdf など）は、先に変換された方が既存として扱われる。
+        for entry in result.results:
+            if entry.success:
+                await _convert_uploaded(images, entry)
+
     if any(r.success for r in result.results):
         await monitor.notify_images_changed(path)
 
     return result
+
+
+async def _convert_uploaded(images: ImageService, entry: OperationResult) -> None:
+    """アップロード済みのイメージを FDX に変換し、結果を `entry` に書き込む。
+
+    アップロード自体は成功しているので、変換に失敗しても `success` は変えず、
+    `message` で知らせるだけにする。元ファイルは残るため手動変換でやり直せる。
+    既存の FDX は上書きしない（`convert()` が拒否する）。
+    """
+    if classify(images.resolve(entry.path)) is not ImageKind.CONVERTIBLE_IMAGE:
+        return
+
+    try:
+        entry.converted_path = await images.convert(entry.path)
+    except AlreadyExists as exc:
+        logger.warning("自動変換をスキップしました: %s (%s)", entry.path, exc.message)
+        entry.message = f"アップロードしましたが、FDX への変換は行いませんでした。{exc.message}"
+    except FDX68Error as exc:
+        logger.warning("自動変換に失敗しました: %s (%s)", entry.path, exc.detail)
+        entry.message = f"アップロードしましたが、FDX への変換に失敗しました。{exc.message}"
 
 
 # --- 移動・複製・リネーム ---------------------------------------------------

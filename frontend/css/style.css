@@ -148,6 +148,13 @@ code { font-family: var(--font-mono); font-size: 0.9em; }
 
 .button-row { display: flex; gap: var(--space-sm); flex-wrap: wrap; }
 .toolbar { display: flex; gap: var(--space-sm); flex-wrap: wrap; }
+.toolbar__option {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--font-size-small);
+  cursor: pointer;
+}
 
 /* システムの3ボタンは折り返さず1行に並べる */
 #system-panel .button-row { flex-wrap: nowrap; }

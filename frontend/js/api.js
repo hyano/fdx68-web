@@ -92,10 +92,11 @@ export const api = {
    * アップロードは fetch では進捗が取れないため XMLHttpRequest を使う。
    * 数 MB〜数十 MB を LAN 越しに送るので、進捗表示がないと固まったように見える。
    */
-  upload(path, file, onProgress) {
+  upload(path, file, onProgress, { autoConvert = false } = {}) {
     return new Promise((resolve, reject) => {
       const form = new FormData();
       form.append("path", path);
+      form.append("auto_convert", String(autoConvert));
       form.append("files", file, file.name);
 
       const xhr = new XMLHttpRequest();

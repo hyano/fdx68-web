@@ -333,9 +333,10 @@ class ImageService:
 
         destination = source.with_suffix(FDX_EXTENSION)
 
-        if destination.exists():
+        existing = self._find_existing_fdx(destination)
+        if existing is not None:
             raise AlreadyExists(
-                f"変換先「{destination.name}」が既に存在します。"
+                f"変換先「{existing.name}」が既に存在します。"
                 "上書きはしません。先に削除するか名前を変更してください。"
             )
 
@@ -353,6 +354,24 @@ class ImageService:
 
         logger.info("変換しました: %s -> %s", source, destination)
         return self.to_relative(destination)
+
+    @staticmethod
+    def _find_existing_fdx(destination: Path) -> Path | None:
+        """変換先と衝突する既存の FDX を返す。拡張子の大文字小文字は区別しない。
+
+        Pi の ext4 では `GAME.FDX` と `GAME.fdx` が共存できてしまい、
+        ほぼ同じ名前の FDX が並ぶとどちらが正か分からなくなる。
+        また macOS（大文字小文字を区別しない）の開発環境と挙動を揃えるため。
+        """
+        # 実在する名前でメッセージを出すため、ディレクトリ内の実際の名前を先に探す
+        for candidate in destination.parent.iterdir():
+            if candidate.stem == destination.stem and candidate.suffix.lower() == FDX_EXTENSION:
+                return candidate
+
+        # 大文字小文字を区別しないファイルシステムでは stem の違いでも衝突する
+        if destination.exists():
+            return destination
+        return None
 
     # --- ディスク情報 -------------------------------------------------------
 
